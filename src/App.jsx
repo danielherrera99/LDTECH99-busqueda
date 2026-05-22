@@ -78,7 +78,15 @@ function App() {
   const [dniResult, setDniResult] = useState(null);
   const [dniHistory, setDniHistory] = useState(['00000000']);
   
-  const [apiToken, setApiToken] = useState(() => localStorage.getItem('sunat_token') || 'mkP2mNY8qlrcUC5Y0W9ycNWbfUDPelP3caquQFmDNyUt7P5QKULQfyaybHtr');
+  const [apiToken, setApiToken] = useState(() => {
+    const saved = localStorage.getItem('sunat_token');
+    // Si el token guardado contiene 'http' o es muy corto (anterior dominio de prueba), lo saneamos con tu token real
+    if (!saved || saved.includes('http') || saved.length < 20) {
+      localStorage.setItem('sunat_token', 'mkP2mNY8qlrcUC5Y0W9ycNWbfUDPelP3caquQFmDNyUt7P5QKULQfyaybHtr');
+      return 'mkP2mNY8qlrcUC5Y0W9ycNWbfUDPelP3caquQFmDNyUt7P5QKULQfyaybHtr';
+    }
+    return saved;
+  });
   const [showToken, setShowToken] = useState(false);
   const [terminalTab, setTerminalTab] = useState('visual'); // 'visual' | 'json'
 
