@@ -21,7 +21,7 @@ import {
   ArrowRight, 
   MapPin
 } from 'lucide-react';
-import { authService } from './services/api';
+import { authService, sunatService, reniecService } from './services/api';
 import './App.css';
 
 // Componentes SVG Inline para Redes Sociales y Marcas
@@ -63,6 +63,99 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+
+  // --- Estados de Consulta RUC & DNI (SUNAT / RENIEC) ---
+  const [queryType, setQueryType] = useState('ruc'); // 'ruc' | 'dni'
+  const [rucInput, setRucInput] = useState('');
+  const [rucLoading, setRucLoading] = useState(false);
+  const [rucError, setRucError] = useState('');
+  const [rucResult, setRucResult] = useState(null);
+  const [rucHistory, setRucHistory] = useState(['20538856674']);
+  
+  const [dniInput, setDniInput] = useState('');
+  const [dniLoading, setDniLoading] = useState(false);
+  const [dniError, setDniError] = useState('');
+  const [dniResult, setDniResult] = useState(null);
+  const [dniHistory, setDniHistory] = useState(['00000000']);
+  
+  const [apiToken, setApiToken] = useState(() => localStorage.getItem('sunat_token') || '');
+  const [showToken, setShowToken] = useState(false);
+  const [terminalTab, setTerminalTab] = useState('visual'); // 'visual' | 'json'
+
+  const handleTokenChange = (val) => {
+    setApiToken(val);
+    localStorage.setItem('sunat_token', val);
+  };
+
+  // --- Manejador de Consulta RUC ---
+  const handleRucSearch = async (e, customRuc) => {
+    if (e) e.preventDefault();
+    const targetRuc = customRuc || rucInput;
+    
+    setRucError('');
+    setRucResult(null);
+
+    if (!targetRuc.trim()) {
+      setRucError('Ingresa un número de RUC.');
+      return;
+    }
+    if (!/^\d{11}$/.test(targetRuc)) {
+      setRucError('El RUC debe constar de exactamente 11 dígitos numéricos.');
+      return;
+    }
+
+    setRucLoading(true);
+    try {
+      const response = await sunatService.consultarRuc(targetRuc, apiToken);
+      if (response.success) {
+        setRucResult(response.result);
+        
+        // Guardamos en el historial si no existe
+        if (!rucHistory.includes(targetRuc)) {
+          setRucHistory([targetRuc, ...rucHistory.slice(0, 4)]);
+        }
+      }
+    } catch (err) {
+      setRucError(err.message || 'Error al consultar el RUC.');
+    } finally {
+      setRucLoading(false);
+    }
+  };
+
+  // --- Manejador de Consulta DNI ---
+  const handleDniSearch = async (e, customDni) => {
+    if (e) e.preventDefault();
+    const targetDni = customDni || dniInput;
+    
+    setDniError('');
+    setDniResult(null);
+
+    if (!targetDni.trim()) {
+      setDniError('Ingresa un número de DNI.');
+      return;
+    }
+    if (!/^\d{8}$/.test(targetDni)) {
+      setDniError('El DNI debe constar de exactamente 8 dígitos numéricos.');
+      return;
+    }
+
+    setDniLoading(true);
+    try {
+      const response = await reniecService.consultarDni(targetDni, apiToken);
+      if (response.success) {
+        setDniResult(response.result);
+        
+        // Guardamos en el historial si no existe
+        if (!dniHistory.includes(targetDni)) {
+          setDniHistory([targetDni, ...dniHistory.slice(0, 4)]);
+        }
+      }
+    } catch (err) {
+      setDniError(err.message || 'Error al consultar el DNI.');
+    } finally {
+      setDniLoading(false);
+    }
+  };
 
   // --- Estados de la Calculadora de Presupuesto ---
   const [selectedService, setSelectedService] = useState('webapp');
@@ -333,6 +426,7 @@ function App() {
 
         <nav style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
           <a href="#inicio" style={{ color: 'var(--text-main)', textDecoration: 'none', fontSize: '0.9rem', fontWeight: 500, transition: 'color 0.3s' }}>Inicio</a>
+          <a href="#ruc" style={{ color: 'var(--text-main)', textDecoration: 'none', fontSize: '0.9rem', fontWeight: 500, transition: 'color 0.3s' }}>Consola RUC</a>
           <a href="#servicios" style={{ color: 'var(--text-main)', textDecoration: 'none', fontSize: '0.9rem', fontWeight: 500, transition: 'color 0.3s' }}>Servicios</a>
           <a href="#proyectos" style={{ color: 'var(--text-main)', textDecoration: 'none', fontSize: '0.9rem', fontWeight: 500, transition: 'color 0.3s' }}>Proyectos</a>
           <a href="#cotizador" style={{ color: 'var(--text-main)', textDecoration: 'none', fontSize: '0.9rem', fontWeight: 500, transition: 'color 0.3s' }}>Cotizador</a>
@@ -392,6 +486,462 @@ function App() {
           <a href="#proyectos" className="btn btn-secondary">
             Ver Portafolio <ArrowRight size={18} />
           </a>
+        </div>
+      </section>
+
+      {/* Consulta RUC SUNAT & DNI RENIEC Section */}
+      <section id="ruc" style={{ padding: '80px 5%', position: 'relative' }}>
+        <h2 className="section-title">Consola de Consultas de Identidad</h2>
+        <p className="section-subtitle">Validador de RUC (SUNAT) y DNI (RENIEC) en tiempo real con la API de Codart. Pruébalo con los números de referencia o introduce tu Token de API.</p>
+
+        <div className="glass-card" style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+          padding: '40px',
+          gap: '40px',
+          background: 'linear-gradient(135deg, rgba(11, 12, 19, 0.85) 0%, rgba(4, 5, 9, 0.95) 100%)',
+          alignItems: 'start'
+        }}>
+          {/* Formulario y Controles de Consulta */}
+          <div>
+            {/* Campo Token de API */}
+            <div style={{ marginBottom: '25px' }}>
+              <h4 style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <Lock size={12} style={{ color: apiToken ? '#00ff00' : 'rgba(255,255,255,0.4)' }} /> [ CONFIG ] API_BEARER_TOKEN
+              </h4>
+              <div style={{ position: 'relative' }}>
+                <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: 'rgba(0,255,0,0.6)' }}>env_token:</span>
+                <input 
+                  type={showToken ? "text" : "password"}
+                  value={apiToken}
+                  onChange={(e) => handleTokenChange(e.target.value)}
+                  placeholder="Ingresa tu token de api-codart"
+                  style={{
+                    background: 'rgba(0,0,0,0.9)',
+                    border: '1px solid rgba(0, 255, 0, 0.4)',
+                    borderRadius: '6px',
+                    padding: '10px 42px 10px 92px',
+                    width: '100%',
+                    boxSizing: 'border-box',
+                    color: '#00ff00',
+                    fontFamily: 'Courier New, monospace',
+                    fontSize: '12px',
+                    outline: 'none',
+                    transition: 'all 0.3s ease'
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowToken(!showToken)}
+                  style={{
+                    position: 'absolute',
+                    right: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    color: 'rgba(0, 255, 0, 0.6)',
+                    cursor: 'pointer',
+                    padding: 0,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  {showToken ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+
+            {/* Selector de Comando / Tipo de Documento */}
+            <div style={{ marginBottom: '25px' }}>
+              <h4 style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', fontFamily: 'var(--font-mono)' }}>
+                [ SELECT_COMMAND ]
+              </h4>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setQueryType('ruc')}
+                  className={`terminal-tab-btn ${queryType === 'ruc' ? 'active' : ''}`}
+                  style={{ flex: 1, textTransform: 'uppercase', fontSize: '11px', padding: '8px 10px' }}
+                >
+                  1. CONSULTAR_RUC()
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setQueryType('dni')}
+                  className={`terminal-tab-btn ${queryType === 'dni' ? 'active' : ''}`}
+                  style={{ flex: 1, textTransform: 'uppercase', fontSize: '11px', padding: '8px 10px' }}
+                >
+                  2. CONSULTAR_DNI()
+                </button>
+              </div>
+            </div>
+
+            <h3 style={{ fontSize: '1.2rem', marginBottom: '20px', fontFamily: 'var(--font-mono)', borderBottom: '1px solid var(--border-glass)', paddingBottom: '10px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <Terminal size={18} style={{ color: '#00ff00' }} /> PARÁMETROS DE CONSULTA
+            </h3>
+            
+            {queryType === 'ruc' ? (
+              <form onSubmit={handleRucSearch} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                <div style={{ position: 'relative' }}>
+                  <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontFamily: 'var(--font-mono)', fontSize: '0.85rem', color: 'rgba(0,255,0,0.6)' }}>ruc_query:</span>
+                  <input 
+                    type="text" 
+                    value={rucInput}
+                    onChange={(e) => setRucInput(e.target.value.replace(/\D/g, '').slice(0, 11))}
+                    placeholder="20538856674"
+                    maxLength={11}
+                    disabled={rucLoading}
+                    style={{
+                      background: 'rgba(0,0,0,0.9)',
+                      border: '1px solid #00ff00',
+                      borderRadius: '6px',
+                      padding: '12px 12px 12px 100px',
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      color: '#00ff00',
+                      fontFamily: 'Courier New, monospace',
+                      fontSize: '14px',
+                      outline: 'none',
+                      transition: 'all 0.3s ease'
+                    }}
+                    className="ruc-input-glowing"
+                  />
+                </div>
+
+                {rucError && (
+                  <div style={{ color: '#ff7e7e', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px', fontFamily: 'Courier New, monospace' }}>
+                    <AlertTriangle size={14} /> <span>{rucError}</span>
+                  </div>
+                )}
+
+                <button 
+                  type="submit" 
+                  className="login-btn" 
+                  disabled={rucLoading}
+                  style={{
+                    marginTop: '5px',
+                    background: '#00ff00',
+                    color: 'black',
+                    borderColor: '#00ff00',
+                    padding: '12px',
+                    fontSize: '0.9rem'
+                  }}
+                >
+                  {rucLoading ? (
+                    <>
+                      <span className="spinner"></span>
+                      <span>EJECUTANDO CONSULTA SUNAT...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Code size={16} /> <span>EJECUTAR CONSULTAR_RUC()</span>
+                    </>
+                  )}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleDniSearch} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                <div style={{ position: 'relative' }}>
+                  <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontFamily: 'var(--font-mono)', fontSize: '0.85rem', color: 'rgba(0,255,0,0.6)' }}>dni_query:</span>
+                  <input 
+                    type="text" 
+                    value={dniInput}
+                    onChange={(e) => setDniInput(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                    placeholder="00000000"
+                    maxLength={8}
+                    disabled={dniLoading}
+                    style={{
+                      background: 'rgba(0,0,0,0.9)',
+                      border: '1px solid #00ff00',
+                      borderRadius: '6px',
+                      padding: '12px 12px 12px 100px',
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      color: '#00ff00',
+                      fontFamily: 'Courier New, monospace',
+                      fontSize: '14px',
+                      outline: 'none',
+                      transition: 'all 0.3s ease'
+                    }}
+                    className="ruc-input-glowing"
+                  />
+                </div>
+
+                {dniError && (
+                  <div style={{ color: '#ff7e7e', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px', fontFamily: 'Courier New, monospace' }}>
+                    <AlertTriangle size={14} /> <span>{dniError}</span>
+                  </div>
+                )}
+
+                <button 
+                  type="submit" 
+                  className="login-btn" 
+                  disabled={dniLoading}
+                  style={{
+                    marginTop: '5px',
+                    background: '#00ff00',
+                    color: 'black',
+                    borderColor: '#00ff00',
+                    padding: '12px',
+                    fontSize: '0.9rem'
+                  }}
+                >
+                  {dniLoading ? (
+                    <>
+                      <span className="spinner"></span>
+                      <span>EJECUTANDO CONSULTA RENIEC...</span>
+                    </>
+                  ) : (
+                    <>
+                      <User size={16} /> <span>EJECUTAR CONSULTAR_DNI()</span>
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
+
+            {/* Historial de búsquedas */}
+            <div style={{ marginTop: '30px' }}>
+              <h4 style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px', fontFamily: 'var(--font-mono)' }}>
+                Búsquedas Recientes / Accesos Rápidos
+              </h4>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
+                {queryType === 'ruc' ? (
+                  rucHistory.map((historyRuc) => (
+                    <button 
+                      key={historyRuc} 
+                      onClick={(e) => {
+                        setRucInput(historyRuc);
+                        handleRucSearch(e, historyRuc);
+                      }}
+                      disabled={rucLoading}
+                      className="terminal-history-badge"
+                    >
+                      <Terminal size={12} style={{ color: '#00ff00' }} />
+                      <span>{historyRuc === '20538856674' ? '20538856674 (Referencia)' : historyRuc}</span>
+                    </button>
+                  ))
+                ) : (
+                  dniHistory.map((historyDni) => (
+                    <button 
+                      key={historyDni} 
+                      onClick={(e) => {
+                        setDniInput(historyDni);
+                        handleDniSearch(e, historyDni);
+                      }}
+                      disabled={dniLoading}
+                      className="terminal-history-badge"
+                    >
+                      <User size={12} style={{ color: '#00ff00' }} />
+                      <span>{historyDni === '00000000' ? '00000000 (Referencia)' : historyDni}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Consola Terminal de Resultados */}
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button 
+                  className={`terminal-tab-btn ${terminalTab === 'visual' ? 'active' : ''}`}
+                  onClick={() => setTerminalTab('visual')}
+                >
+                  DASHBOARD VISUAL
+                </button>
+                <button 
+                  className={`terminal-tab-btn ${terminalTab === 'json' ? 'active' : ''}`}
+                  onClick={() => setTerminalTab('json')}
+                >
+                  RAW JSON RESP
+                </button>
+              </div>
+              <span style={{ fontSize: '11px', fontFamily: 'Courier New, monospace', color: 'rgba(0, 255, 0, 0.5)' }}>
+                API_GATEWAY: ACTIVE
+              </span>
+            </div>
+
+            <div className="terminal-panel">
+              <div className="terminal-header">
+                <span>// {queryType === 'ruc' ? 'SUNAT DATA STREAM v1.1' : 'RENIEC DATA STREAM v1.1'} //</span>
+                <span>STATUS: {
+                  queryType === 'ruc' 
+                    ? (rucLoading ? 'FETCHING...' : rucResult ? 'SUCCESS' : 'WAITING')
+                    : (dniLoading ? 'FETCHING...' : dniResult ? 'SUCCESS' : 'WAITING')
+                }</span>
+              </div>
+
+              {((queryType === 'ruc' && rucLoading) || (queryType === 'dni' && dniLoading)) && (
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '300px', gap: '15px' }}>
+                  <span className="spinner" style={{ width: '40px', height: '40px', borderWidth: '3px' }}></span>
+                  <span style={{ fontSize: '12px', letterSpacing: '2px', color: '#00ff00', animation: 'terminal-blink 1s infinite' }}>DESCIFRANDO STREAM DE DATOS...</span>
+                </div>
+              )}
+
+              {queryType === 'ruc' && !rucLoading && !rucResult && (
+                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '300px', color: 'rgba(0,255,0,0.5)', fontSize: '13px', lineHeight: '1.8' }}>
+                  <p>&gt; LDTECH99 RUC QUERY INTERFACE READY.</p>
+                  <p>&gt; ESPERANDO CONSULTA DE RUC VALIDO...</p>
+                  <p>&gt; CONEXION ESTABLECIDA CON EL SERVIDOR DE SUNAT EN TIEMPO REAL.</p>
+                  <p>&gt; Haz clic en la búsqueda reciente de **20538856674** para realizar una consulta de prueba inmediata.<span className="terminal-cursor"></span></p>
+                </div>
+              )}
+
+              {queryType === 'dni' && !dniLoading && !dniResult && (
+                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '300px', color: 'rgba(0,255,0,0.5)', fontSize: '13px', lineHeight: '1.8' }}>
+                  <p>&gt; LDTECH99 DNI QUERY INTERFACE READY.</p>
+                  <p>&gt; ESPERANDO CONSULTA DE DNI VALIDO...</p>
+                  <p>&gt; CONEXION ESTABLECIDA CON EL SERVIDOR DE RENIEC EN TIEMPO REAL.</p>
+                  <p>&gt; Haz clic en la búsqueda reciente de **00000000** para realizar una consulta de prueba inmediata.<span className="terminal-cursor"></span></p>
+                </div>
+              )}
+
+              {queryType === 'ruc' && !rucLoading && rucResult && (
+                <>
+                  {terminalTab === 'visual' ? (
+                    <div>
+                      <div style={{ marginBottom: '20px', borderBottom: '1px dashed rgba(0, 255, 0, 0.2)', paddingBottom: '15px' }}>
+                        <span style={{ fontSize: '11px', color: 'rgba(0, 255, 0, 0.6)', display: 'block' }}>RAZÓN SOCIAL</span>
+                        <h4 style={{ fontSize: '1.4rem', color: '#ffffff', fontWeight: 'bold', margin: '4px 0 8px 0', textShadow: '0 0 5px rgba(0,255,0,0.2)' }}>
+                          {rucResult.razon_social}
+                        </h4>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          <span className="terminal-glow-chip">RUC: {rucResult.numero_documento}</span>
+                          <span className={`terminal-glow-chip ${rucResult.estado === 'ACTIVO' ? '' : 'danger'}`}>
+                            {rucResult.estado}
+                          </span>
+                          <span className="terminal-glow-chip">{rucResult.condicion}</span>
+                        </div>
+                      </div>
+
+                      <div className="terminal-row">
+                        <span className="terminal-label">Dirección Fiscal:</span>
+                        <span className="terminal-value">
+                          {rucResult.direccion}, {rucResult.distrito} - {rucResult.provincia} - {rucResult.departamento}
+                        </span>
+                      </div>
+
+                      <div className="terminal-row">
+                        <span className="terminal-label">Actividad Económica:</span>
+                        <span className="terminal-value">{rucResult.actividad_economica}</span>
+                      </div>
+
+                      <div className="terminal-row">
+                        <span className="terminal-label">Tipo de Empresa:</span>
+                        <span className="terminal-value">{rucResult.tipo}</span>
+                      </div>
+
+                      <div className="terminal-row">
+                        <span className="terminal-label">Nro Trabajadores / Facturación:</span>
+                        <span className="terminal-value">
+                          {rucResult.numero_trabajadores} trabajador(es) // Facturación {rucResult.tipo_facturacion}
+                        </span>
+                      </div>
+
+                      <div className="terminal-row">
+                        <span className="terminal-label">Contabilidad / Comercio Exterior:</span>
+                        <span className="terminal-value">
+                          Contabilidad {rucResult.tipo_contabilidad} // {rucResult.comercio_exterior}
+                        </span>
+                      </div>
+
+                      <div className="terminal-row">
+                        <span className="terminal-label">Buen Contribuyente:</span>
+                        <span className="terminal-value" style={{ color: rucResult.es_buen_contribuyente ? '#00ff88' : '#ff7e7e' }}>
+                          {rucResult.es_buen_contribuyente ? '✔ SÍ (Certificado SUNAT Activo)' : '✘ NO'}
+                        </span>
+                      </div>
+
+                      <div className="terminal-row" style={{ borderBottom: 'none' }}>
+                        <span className="terminal-label">Agente de Retención:</span>
+                        <span className="terminal-value" style={{ color: rucResult.es_agente_retencion ? '#00ff88' : '#ff7e7e' }}>
+                          {rucResult.es_agente_retencion ? '✔ SÍ' : '✘ NO'}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <pre style={{ margin: 0, padding: 0, overflowX: 'auto', whiteSpace: 'pre-wrap', fontSize: '11px', color: '#88ff88', lineHeight: '1.4' }}>
+                        {JSON.stringify({ success: true, source: "CODART_X_API_V1", result: rucResult }, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {queryType === 'dni' && !dniLoading && dniResult && (
+                <>
+                  {terminalTab === 'visual' ? (
+                    <div>
+                      <div style={{ marginBottom: '20px', borderBottom: '1px dashed rgba(0, 255, 0, 0.2)', paddingBottom: '15px' }}>
+                        <span style={{ fontSize: '11px', color: 'rgba(0, 255, 0, 0.6)', display: 'block' }}>NOMBRE COMPLETO</span>
+                        <h4 style={{ fontSize: '1.4rem', color: '#ffffff', fontWeight: 'bold', margin: '4px 0 8px 0', textShadow: '0 0 5px rgba(0,255,0,0.2)' }}>
+                          {dniResult.full_name}
+                        </h4>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          <span className="terminal-glow-chip">DNI: {dniResult.document_number}</span>
+                          <span className="terminal-glow-chip">DNI ACTIVO</span>
+                          <span className="terminal-glow-chip">{dniResult.nationality}</span>
+                          <span className="terminal-glow-chip" style={{ background: 'rgba(0, 242, 254, 0.15)', borderColor: '#00f2fe', color: '#00f2fe' }}>
+                            SEXO: {dniResult.gender === 'F' ? 'FEMENINO ♀' : 'MASCULINO ♂'}
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="terminal-row">
+                        <span className="terminal-label">Nombres:</span>
+                        <span className="terminal-value">{dniResult.first_name}</span>
+                      </div>
+
+                      <div className="terminal-row">
+                        <span className="terminal-label">Apellido Paterno:</span>
+                        <span className="terminal-value">{dniResult.first_last_name}</span>
+                      </div>
+
+                      <div className="terminal-row">
+                        <span className="terminal-label">Apellido Materno:</span>
+                        <span className="terminal-value">{dniResult.second_last_name}</span>
+                      </div>
+
+                      <div className="terminal-row">
+                        <span className="terminal-label">Fecha de Nacimiento:</span>
+                        <span className="terminal-value">{dniResult.birth_date}</span>
+                      </div>
+
+                      <div className="terminal-row">
+                        <span className="terminal-label">Dirección Fiscal / Domicilio:</span>
+                        <span className="terminal-value">{dniResult.address}</span>
+                      </div>
+
+                      <div className="terminal-row">
+                        <span className="terminal-label">Distrito / Provincia / Depto:</span>
+                        <span className="terminal-value">
+                          {dniResult.district} - {dniResult.province} - {dniResult.department}
+                        </span>
+                      </div>
+
+                      <div className="terminal-row" style={{ borderBottom: 'none' }}>
+                        <span className="terminal-label">Contacto (Telf / Email):</span>
+                        <span className="terminal-value">
+                          {dniResult.phone} // {dniResult.email}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <pre style={{ margin: 0, padding: 0, overflowX: 'auto', whiteSpace: 'pre-wrap', fontSize: '11px', color: '#88ff88', lineHeight: '1.4' }}>
+                        {JSON.stringify({ success: true, source: "CODART_X_API_V1", result: dniResult }, null, 2)}
+                      </pre>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
         </div>
       </section>
 
