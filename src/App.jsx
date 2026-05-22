@@ -19,9 +19,27 @@ import {
   Smartphone, 
   Terminal, 
   ArrowRight, 
-  MapPin
+  MapPin,
+  Car,
+  PhoneCall,
+  Users,
+  Search,
+  Fingerprint,
+  Shield,
+  Wifi
 } from 'lucide-react';
-import { authService, sunatService, reniecService } from './services/api';
+import {
+  authService,
+  sunatService,
+  reniecBasicService,
+  reniecService,
+  dnitService,
+  nmService,
+  agService,
+  telpService,
+  telpCelService,
+  plaService
+} from './services/api';
 import './App.css';
 
 // Componentes SVG Inline para Redes Sociales y Marcas
@@ -64,25 +82,40 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
 
-  // --- Estados de Consulta RUC & DNI (SUNAT / RENIEC) ---
-  const [queryType, setQueryType] = useState('ruc'); // 'ruc' | 'dni'
-  const [rucInput, setRucInput] = useState('');
-  const [rucLoading, setRucLoading] = useState(false);
-  const [rucError, setRucError] = useState('');
-  const [rucResult, setRucResult] = useState(null);
-  const [rucHistory, setRucHistory] = useState(['20538856674']);
-  
-  const [dniInput, setDniInput] = useState('');
-  const [dniLoading, setDniLoading] = useState(false);
-  const [dniError, setDniError] = useState('');
-  const [dniResult, setDniResult] = useState(null);
-  const [dniHistory, setDniHistory] = useState(['00000000']);
-  
+  // --- Estados del Sistema OSINT (9 Módulos Codart) ---
+  const [osintModule, setOsintModule] = useState('ruc'); // ruc|dni_basic|dni_premium|dnit|nm|ag|telp|telp_cel|pla
+  const [gatewayMode, setGatewayMode] = useState('direct'); // 'direct' | 'backend'
+
+  // Inputs dinámicos
+  const [queryInput, setQueryInput] = useState('');   // Input principal (RUC/DNI/Placa/Celular)
+  const [nmN1, setNmN1] = useState('');               // Nombre 1 (para NM)
+  const [nmAp1, setNmAp1] = useState('');             // Apellido 1 (para NM)
+  const [nmAp2, setNmAp2] = useState('');             // Apellido 2 (para NM)
+
+  // Estado unificado de resultados
+  const [osintLoading, setOsintLoading] = useState(false);
+  const [osintError, setOsintError] = useState('');
+  const [osintResult, setOsintResult] = useState(null);
+  const [osintSource, setOsintSource] = useState('');
+  const [queryHistory, setQueryHistory] = useState(['20538856674', '00000000']);
+
+  // Compatibilidad retroactiva (alias)
+  const queryType    = osintModule === 'ruc' ? 'ruc' : 'dni';
+  const rucLoading   = osintLoading && osintModule === 'ruc';
+  const dniLoading   = osintLoading && osintModule !== 'ruc';
+  const rucResult    = osintModule === 'ruc' ? osintResult : null;
+  const dniResult    = osintModule !== 'ruc' ? osintResult : null;
+  const rucSource    = osintSource;
+  const dniSource    = osintSource;
+  const rucInput     = osintModule === 'ruc' ? queryInput : '';
+  const dniInput     = osintModule !== 'ruc' ? queryInput : '';
+  const rucHistory   = ['20538856674'];
+  const dniHistory   = ['00000000'];
+
   const [apiToken, setApiToken] = useState(() => {
     const saved = localStorage.getItem('sunat_token');
-    // Si el token guardado contiene 'http' o es muy corto, lo saneamos con el token verificado de tu Laravel
     if (!saved || saved.includes('http') || saved.length < 20) {
-      const defaultToken = 'vSJR6tai39CnDrdZ4EOamF3Dzi172ktDBfO46B2E81wVB78RSHx925rydyRW';
+      const defaultToken = 'mkP2mNY8qlrcUC5Y0W9ycNWbfUDPelP3caquQFmDNyUt7P5QKULQfyaybHtr';
       localStorage.setItem('sunat_token', defaultToken);
       return defaultToken;
     }
@@ -96,75 +129,74 @@ function App() {
     localStorage.setItem('sunat_token', val);
   };
 
-  // --- Manejador de Consulta RUC ---
-  const handleRucSearch = async (e, customRuc) => {
+  // ─── Mapa de configuraciones por módulo ──────────────────────────────────────
+  const MODULE_CONFIG = {
+    ruc:        { label: 'CONSULTAR_RUC()',         cost: '1 Pet',   color: '#00ff00', icon: '🏢', placeholder: '20538856674', maxLen: 11, validate: /^\d{11}$/, hint: '11 dígitos' },
+    dni_basic:  { label: 'CONSULTAR_DNI_BASIC()',   cost: '1 Pet',   color: '#00f2fe', icon: '👤', placeholder: '00000000',    maxLen: 8,  validate: /^\d{8}$/,  hint: '8 dígitos' },
+    dni_premium:{ label: 'CONSULTAR_DNI_PREMIUM()', cost: '2 Cred',  color: '#9b51e0', icon: '🪪', placeholder: '00000000',    maxLen: 8,  validate: /^\d{8}$/,  hint: '8 dígitos' },
+    dnit:       { label: 'CONSULTAR_DNIT_EXT()',    cost: '5 Cred',  color: '#ff6b35', icon: '🔏', placeholder: '00000000',    maxLen: 8,  validate: /^\d{8}$/,  hint: '8 dígitos' },
+    nm:         { label: 'CONSULTAR_NM()',          cost: '4 Cred',  color: '#ffaa00', icon: '🔍', placeholder: 'LUIS',          maxLen: 30, validate: /.{2,}/,    hint: 'n1 + ap1 + ap2' },
+    ag:         { label: 'CONSULTAR_AG()',          cost: '8 Cred',  color: '#ff4d94', icon: '🌳', placeholder: '00000000',    maxLen: 8,  validate: /^\d{8}$/,  hint: '8 dígitos' },
+    telp:       { label: 'CONSULTAR_TELP()',        cost: '15 Cred', color: '#00ff88', icon: '📱', placeholder: '00000000',    maxLen: 8,  validate: /^\d{8}$/,  hint: '8 dígitos' },
+    telp_cel:   { label: 'CONSULTAR_TELP_CEL()',   cost: '15 Cred', color: '#00aaff', icon: '📞', placeholder: '956041289',    maxLen: 9,  validate: /^\d{9}$/,  hint: '9 dígitos (celular)' },
+    pla:        { label: 'CONSULTAR_PLA()',         cost: '2 Cred',  color: '#ffdd00', icon: '🚗', placeholder: 'D5G960',        maxLen: 7,  validate: /^[A-Z0-9]{6,7}$/i, hint: '6-7 alfanuméricos' },
+  };
+
+  // ─── Manejador OSINT unificado (9 módulos) ──────────────────────────────────
+  const handleOsintSearch = async (e, customInput) => {
     if (e) e.preventDefault();
-    const targetRuc = customRuc || rucInput;
-    
-    setRucError('');
-    setRucResult(null);
+    const target = customInput || queryInput;
 
-    if (!targetRuc.trim()) {
-      setRucError('Ingresa un número de RUC.');
-      return;
-    }
-    if (!/^\d{11}$/.test(targetRuc)) {
-      setRucError('El RUC debe constar de exactamente 11 dígitos numéricos.');
-      return;
+    setOsintError('');
+    setOsintResult(null);
+    setOsintSource('');
+
+    // Validación por módulo
+    const cfg = MODULE_CONFIG[osintModule];
+    if (osintModule === 'nm') {
+      if (!nmN1 || nmN1.length < 2) { setOsintError('Ingresa el primer nombre (mínimo 2 letras).'); return; }
+      if (!nmAp1 || nmAp1.length < 2) { setOsintError('Ingresa el primer apellido (mínimo 2 letras).'); return; }
+      if (!nmAp2 || nmAp2.length < 2) { setOsintError('Ingresa el segundo apellido (mínimo 2 letras).'); return; }
+    } else {
+      if (!target.trim()) { setOsintError(`Ingresa ${cfg.hint}.`); return; }
+      if (!cfg.validate.test(target.trim().toUpperCase())) { setOsintError(`Formato inválido. Se esperan: ${cfg.hint}.`); return; }
     }
 
-    setRucLoading(true);
+    setOsintLoading(true);
     try {
-      const response = await sunatService.consultarRuc(targetRuc, apiToken);
+      let response;
+      const mode = gatewayMode;
+      switch (osintModule) {
+        case 'ruc':         response = await sunatService.consultarRuc(target, apiToken, mode); break;
+        case 'dni_basic':   response = await reniecBasicService.consultarDni(target, apiToken, mode); break;
+        case 'dni_premium': response = await reniecService.consultarDni(target, apiToken, mode); break;
+        case 'dnit':        response = await dnitService.consultarDnit(target, apiToken, mode); break;
+        case 'nm':          response = await nmService.consultarNm({ n1: nmN1, ap1: nmAp1, ap2: nmAp2 }, apiToken, mode); break;
+        case 'ag':          response = await agService.consultarAg(target, apiToken, mode); break;
+        case 'telp':        response = await telpService.consultarTelp(target, apiToken, mode); break;
+        case 'telp_cel':    response = await telpCelService.consultarTelpCel(target, apiToken, mode); break;
+        case 'pla':         response = await plaService.consultarPla(target, apiToken, mode); break;
+        default: throw new Error('Módulo no reconocido.');
+      }
       if (response.success) {
-        setRucResult(response.result);
-        
-        // Guardamos en el historial si no existe
-        if (!rucHistory.includes(targetRuc)) {
-          setRucHistory([targetRuc, ...rucHistory.slice(0, 4)]);
+        setOsintResult(response.data || response.result || response);
+        setOsintSource(response.source || 'CODART_X_API_V1');
+        if (osintModule !== 'nm' && target && !queryHistory.includes(target)) {
+          setQueryHistory([target, ...queryHistory.slice(0, 6)]);
         }
+      } else {
+        setOsintError(response.message || 'La consulta no retornó resultados.');
       }
     } catch (err) {
-      setRucError(err.message || 'Error al consultar el RUC.');
+      setOsintError(err.message || 'Error en la consulta OSINT.');
     } finally {
-      setRucLoading(false);
+      setOsintLoading(false);
     }
   };
 
-  // --- Manejador de Consulta DNI ---
-  const handleDniSearch = async (e, customDni) => {
-    if (e) e.preventDefault();
-    const targetDni = customDni || dniInput;
-    
-    setDniError('');
-    setDniResult(null);
-
-    if (!targetDni.trim()) {
-      setDniError('Ingresa un número de DNI.');
-      return;
-    }
-    if (!/^\d{8}$/.test(targetDni)) {
-      setDniError('El DNI debe constar de exactamente 8 dígitos numéricos.');
-      return;
-    }
-
-    setDniLoading(true);
-    try {
-      const response = await reniecService.consultarDni(targetDni, apiToken);
-      if (response.success) {
-        setDniResult(response.result);
-        
-        // Guardamos en el historial si no existe
-        if (!dniHistory.includes(targetDni)) {
-          setDniHistory([targetDni, ...dniHistory.slice(0, 4)]);
-        }
-      }
-    } catch (err) {
-      setDniError(err.message || 'Error al consultar el DNI.');
-    } finally {
-      setDniLoading(false);
-    }
-  };
+  // Alias retrocompatibles
+  const handleRucSearch = (e, v) => { setOsintModule('ruc'); if(v) setQueryInput(v); handleOsintSearch(e, v); };
+  const handleDniSearch = (e, v) => { setOsintModule('dni_premium'); if(v) setQueryInput(v); handleOsintSearch(e, v); };
 
   // --- Estados de la Calculadora de Presupuesto ---
   const [selectedService, setSelectedService] = useState('webapp');
@@ -498,10 +530,10 @@ function App() {
         </div>
       </section>
 
-      {/* Consulta RUC SUNAT & DNI RENIEC Section */}
+      {/* Consulta OSINT Section - 9 Módulos */}
       <section id="ruc" style={{ padding: '80px 5%', position: 'relative' }}>
-        <h2 className="section-title">Consola de Consultas de Identidad</h2>
-        <p className="section-subtitle">Validador de RUC (SUNAT) y DNI (RENIEC) en tiempo real con la API de Codart. Pruébalo con los números de referencia o introduce tu Token de API.</p>
+        <h2 className="section-title">Consola OSINT Premium</h2>
+        <p className="section-subtitle">Gateway de Validación de Identidad en Tiempo Real · 9 Módulos Codart API · Arquitectura Laravel Segura</p>
 
         <div className="glass-card" style={{
           display: 'grid',
@@ -511,243 +543,116 @@ function App() {
           background: 'linear-gradient(135deg, rgba(11, 12, 19, 0.85) 0%, rgba(4, 5, 9, 0.95) 100%)',
           alignItems: 'start'
         }}>
-          {/* Formulario y Controles de Consulta */}
+
+          {/* Panel de Control Izquierdo */}
           <div>
-            {/* Campo Token de API */}
-            <div style={{ marginBottom: '25px' }}>
-              <h4 style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+
+            {/* Token Config */}
+            <div style={{ marginBottom: '20px' }}>
+              <h4 style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px', fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <Lock size={12} style={{ color: apiToken ? '#00ff00' : 'rgba(255,255,255,0.4)' }} /> [ CONFIG ] API_BEARER_TOKEN
               </h4>
               <div style={{ position: 'relative' }}>
-                <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontFamily: 'var(--font-mono)', fontSize: '0.8rem', color: 'rgba(0,255,0,0.6)' }}>env_token:</span>
-                <input 
-                  type={showToken ? "text" : "password"}
+                <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'rgba(0,255,0,0.6)', whiteSpace: 'nowrap' }}>token:</span>
+                <input
+                  type={showToken ? 'text' : 'password'}
                   value={apiToken}
                   onChange={(e) => handleTokenChange(e.target.value)}
-                  placeholder="Ingresa tu token de api-codart"
-                  style={{
-                    background: 'rgba(0,0,0,0.9)',
-                    border: '1px solid rgba(0, 255, 0, 0.4)',
-                    borderRadius: '6px',
-                    padding: '10px 42px 10px 92px',
-                    width: '100%',
-                    boxSizing: 'border-box',
-                    color: '#00ff00',
-                    fontFamily: 'Courier New, monospace',
-                    fontSize: '12px',
-                    outline: 'none',
-                    transition: 'all 0.3s ease'
-                  }}
+                  style={{ background: 'rgba(0,0,0,0.9)', border: '1px solid rgba(0,255,0,0.4)', borderRadius: '6px', padding: '9px 38px 9px 62px', width: '100%', boxSizing: 'border-box', color: '#00ff00', fontFamily: 'Courier New, monospace', fontSize: '11px', outline: 'none' }}
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowToken(!showToken)}
-                  style={{
-                    position: 'absolute',
-                    right: '12px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'none',
-                    border: 'none',
-                    color: 'rgba(0, 255, 0, 0.6)',
-                    cursor: 'pointer',
-                    padding: 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center'
-                  }}
-                >
-                  {showToken ? <EyeOff size={16} /> : <Eye size={16} />}
+                <button type="button" onClick={() => setShowToken(!showToken)} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'rgba(0,255,0,0.6)', cursor: 'pointer', padding: 0, display: 'flex' }}>
+                  {showToken ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
               </div>
             </div>
 
-            {/* Selector de Comando / Tipo de Documento */}
-            <div style={{ marginBottom: '25px' }}>
-              <h4 style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', fontFamily: 'var(--font-mono)' }}>
-                [ SELECT_COMMAND ]
-              </h4>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button
-                  type="button"
-                  onClick={() => setQueryType('ruc')}
-                  className={`terminal-tab-btn ${queryType === 'ruc' ? 'active' : ''}`}
-                  style={{ flex: 1, textTransform: 'uppercase', fontSize: '11px', padding: '8px 10px' }}
-                >
-                  1. CONSULTAR_RUC()
+            {/* Gateway Mode Toggle */}
+            <div style={{ marginBottom: '20px' }}>
+              <h4 style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px', fontFamily: 'var(--font-mono)' }}>[ GATEWAY_MODE ]</h4>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button type="button" onClick={() => setGatewayMode('direct')}
+                  style={{ flex: 1, padding: '8px 6px', fontSize: '10px', fontFamily: 'var(--font-mono)', background: gatewayMode === 'direct' ? 'rgba(0,255,0,0.1)' : 'rgba(0,0,0,0.5)', border: `1px solid ${gatewayMode === 'direct' ? '#00ff00' : 'rgba(255,255,255,0.1)'}`, color: gatewayMode === 'direct' ? '#00ff00' : 'rgba(255,255,255,0.4)', borderRadius: '6px', cursor: 'pointer' }}>
+                  ⚡ CLIENT-SIDE DIRECT
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setQueryType('dni')}
-                  className={`terminal-tab-btn ${queryType === 'dni' ? 'active' : ''}`}
-                  style={{ flex: 1, textTransform: 'uppercase', fontSize: '11px', padding: '8px 10px' }}
-                >
-                  2. CONSULTAR_DNI()
+                <button type="button" onClick={() => setGatewayMode('backend')}
+                  style={{ flex: 1, padding: '8px 6px', fontSize: '10px', fontFamily: 'var(--font-mono)', background: gatewayMode === 'backend' ? 'rgba(0,242,254,0.1)' : 'rgba(0,0,0,0.5)', border: `1px solid ${gatewayMode === 'backend' ? '#00f2fe' : 'rgba(255,255,255,0.1)'}`, color: gatewayMode === 'backend' ? '#00f2fe' : 'rgba(255,255,255,0.4)', borderRadius: '6px', cursor: 'pointer' }}>
+                  🔒 SECURE BACKEND
                 </button>
               </div>
             </div>
 
-            <h3 style={{ fontSize: '1.2rem', marginBottom: '20px', fontFamily: 'var(--font-mono)', borderBottom: '1px solid var(--border-glass)', paddingBottom: '10px', display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <Terminal size={18} style={{ color: '#00ff00' }} /> PARÁMETROS DE CONSULTA
+            {/* Selector de 9 Módulos */}
+            <div style={{ marginBottom: '20px' }}>
+              <h4 style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px', fontFamily: 'var(--font-mono)' }}>[ OSINT_MODULE ]</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px' }}>
+                {Object.entries(MODULE_CONFIG).map(([key, cfg]) => (
+                  <button key={key} type="button"
+                    onClick={() => { setOsintModule(key); setOsintResult(null); setOsintError(''); setQueryInput(''); }}
+                    style={{ padding: '7px 6px', fontSize: '9px', fontFamily: 'var(--font-mono)', background: osintModule === key ? `${cfg.color}18` : 'rgba(0,0,0,0.5)', border: `1px solid ${osintModule === key ? cfg.color : 'rgba(255,255,255,0.08)'}`, color: osintModule === key ? cfg.color : 'rgba(255,255,255,0.4)', borderRadius: '5px', cursor: 'pointer', textAlign: 'left', lineHeight: '1.3', transition: 'all 0.2s ease' }}>
+                    <span style={{ fontSize: '12px' }}>{cfg.icon}</span> {cfg.label}<br/>
+                    <span style={{ opacity: 0.6 }}>{cfg.cost}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <h3 style={{ fontSize: '1.1rem', marginBottom: '16px', fontFamily: 'var(--font-mono)', borderBottom: '1px solid var(--border-glass)', paddingBottom: '8px', display: 'flex', gap: '8px', alignItems: 'center', color: MODULE_CONFIG[osintModule]?.color }}>
+              <Terminal size={16} /> {MODULE_CONFIG[osintModule]?.label}
             </h3>
-            
-            {queryType === 'ruc' ? (
-              <form onSubmit={handleRucSearch} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+
+            {/* Formulario dinámico según módulo */}
+            <form onSubmit={handleOsintSearch} style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {osintModule === 'nm' ? (
+                <>
+                  {[['n1', 'Primer Nombre', nmN1, setNmN1], ['ap1', 'Primer Apellido', nmAp1, setNmAp1], ['ap2', 'Segundo Apellido', nmAp2, setNmAp2]].map(([field, lbl, val, setter]) => (
+                    <div key={field} style={{ position: 'relative' }}>
+                      <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'rgba(255,170,0,0.7)' }}>{field}:</span>
+                      <input type="text" value={val} onChange={e => setter(e.target.value.toUpperCase())} placeholder={lbl} disabled={osintLoading}
+                        style={{ background: 'rgba(0,0,0,0.9)', border: '1px solid #ffaa00', borderRadius: '6px', padding: '10px 10px 10px 50px', width: '100%', boxSizing: 'border-box', color: '#ffaa00', fontFamily: 'Courier New, monospace', fontSize: '13px', outline: 'none' }} />
+                    </div>
+                  ))}
+                </>
+              ) : (
                 <div style={{ position: 'relative' }}>
-                  <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontFamily: 'var(--font-mono)', fontSize: '0.85rem', color: 'rgba(0,255,0,0.6)' }}>ruc_query:</span>
-                  <input 
-                    type="text" 
-                    value={rucInput}
-                    onChange={(e) => setRucInput(e.target.value.replace(/\D/g, '').slice(0, 11))}
-                    placeholder="20538856674"
-                    maxLength={11}
-                    disabled={rucLoading}
-                    style={{
-                      background: 'rgba(0,0,0,0.9)',
-                      border: '1px solid #00ff00',
-                      borderRadius: '6px',
-                      padding: '12px 12px 12px 100px',
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      color: '#00ff00',
-                      fontFamily: 'Courier New, monospace',
-                      fontSize: '14px',
-                      outline: 'none',
-                      transition: 'all 0.3s ease'
-                    }}
+                  <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: `${MODULE_CONFIG[osintModule]?.color}99`, whiteSpace: 'nowrap' }}>
+                    {osintModule}_query:
+                  </span>
+                  <input type="text" value={queryInput}
+                    onChange={e => setQueryInput(osintModule === 'pla' ? e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, MODULE_CONFIG[osintModule]?.maxLen) : e.target.value.replace(/\D/g, '').slice(0, MODULE_CONFIG[osintModule]?.maxLen))}
+                    placeholder={MODULE_CONFIG[osintModule]?.placeholder}
+                    maxLength={MODULE_CONFIG[osintModule]?.maxLen}
+                    disabled={osintLoading}
                     className="ruc-input-glowing"
-                  />
+                    style={{ background: 'rgba(0,0,0,0.9)', border: `1px solid ${MODULE_CONFIG[osintModule]?.color}`, borderRadius: '6px', padding: '11px 11px 11px 110px', width: '100%', boxSizing: 'border-box', color: MODULE_CONFIG[osintModule]?.color, fontFamily: 'Courier New, monospace', fontSize: '14px', outline: 'none' }} />
                 </div>
+              )}
 
-                {rucError && (
-                  <div style={{ color: '#ff7e7e', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px', fontFamily: 'Courier New, monospace' }}>
-                    <AlertTriangle size={14} /> <span>{rucError}</span>
-                  </div>
-                )}
-
-                <button 
-                  type="submit" 
-                  className="login-btn" 
-                  disabled={rucLoading}
-                  style={{
-                    marginTop: '5px',
-                    background: '#00ff00',
-                    color: 'black',
-                    borderColor: '#00ff00',
-                    padding: '12px',
-                    fontSize: '0.9rem'
-                  }}
-                >
-                  {rucLoading ? (
-                    <>
-                      <span className="spinner"></span>
-                      <span>EJECUTANDO CONSULTA SUNAT...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Code size={16} /> <span>EJECUTAR CONSULTAR_RUC()</span>
-                    </>
-                  )}
-                </button>
-              </form>
-            ) : (
-              <form onSubmit={handleDniSearch} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                <div style={{ position: 'relative' }}>
-                  <span style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', fontFamily: 'var(--font-mono)', fontSize: '0.85rem', color: 'rgba(0,255,0,0.6)' }}>dni_query:</span>
-                  <input 
-                    type="text" 
-                    value={dniInput}
-                    onChange={(e) => setDniInput(e.target.value.replace(/\D/g, '').slice(0, 8))}
-                    placeholder="00000000"
-                    maxLength={8}
-                    disabled={dniLoading}
-                    style={{
-                      background: 'rgba(0,0,0,0.9)',
-                      border: '1px solid #00ff00',
-                      borderRadius: '6px',
-                      padding: '12px 12px 12px 100px',
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      color: '#00ff00',
-                      fontFamily: 'Courier New, monospace',
-                      fontSize: '14px',
-                      outline: 'none',
-                      transition: 'all 0.3s ease'
-                    }}
-                    className="ruc-input-glowing"
-                  />
+              {osintError && (
+                <div style={{ color: '#ff7e7e', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px', fontFamily: 'Courier New, monospace' }}>
+                  <AlertTriangle size={13} /> <span>{osintError}</span>
                 </div>
+              )}
 
-                {dniError && (
-                  <div style={{ color: '#ff7e7e', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '6px', fontFamily: 'Courier New, monospace' }}>
-                    <AlertTriangle size={14} /> <span>{dniError}</span>
-                  </div>
-                )}
-
-                <button 
-                  type="submit" 
-                  className="login-btn" 
-                  disabled={dniLoading}
-                  style={{
-                    marginTop: '5px',
-                    background: '#00ff00',
-                    color: 'black',
-                    borderColor: '#00ff00',
-                    padding: '12px',
-                    fontSize: '0.9rem'
-                  }}
-                >
-                  {dniLoading ? (
-                    <>
-                      <span className="spinner"></span>
-                      <span>EJECUTANDO CONSULTA RENIEC...</span>
-                    </>
-                  ) : (
-                    <>
-                      <User size={16} /> <span>EJECUTAR CONSULTAR_DNI()</span>
-                    </>
-                  )}
-                </button>
-              </form>
-            )}
-
-            {/* Historial de búsquedas */}
-            <div style={{ marginTop: '30px' }}>
-              <h4 style={{ fontSize: '0.85rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '12px', fontFamily: 'var(--font-mono)' }}>
-                Búsquedas Recientes / Accesos Rápidos
-              </h4>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px' }}>
-                {queryType === 'ruc' ? (
-                  rucHistory.map((historyRuc) => (
-                    <button 
-                      key={historyRuc} 
-                      onClick={(e) => {
-                        setRucInput(historyRuc);
-                        handleRucSearch(e, historyRuc);
-                      }}
-                      disabled={rucLoading}
-                      className="terminal-history-badge"
-                    >
-                      <Terminal size={12} style={{ color: '#00ff00' }} />
-                      <span>{historyRuc === '20538856674' ? '20538856674 (Referencia)' : historyRuc}</span>
-                    </button>
-                  ))
+              <button type="submit" className="login-btn" disabled={osintLoading}
+                style={{ marginTop: '4px', background: MODULE_CONFIG[osintModule]?.color, color: 'black', borderColor: MODULE_CONFIG[osintModule]?.color, padding: '11px', fontSize: '0.85rem' }}>
+                {osintLoading ? (
+                  <><span className="spinner"></span><span>EJECUTANDO CONSULTA...</span></>
                 ) : (
-                  dniHistory.map((historyDni) => (
-                    <button 
-                      key={historyDni} 
-                      onClick={(e) => {
-                        setDniInput(historyDni);
-                        handleDniSearch(e, historyDni);
-                      }}
-                      disabled={dniLoading}
-                      className="terminal-history-badge"
-                    >
-                      <User size={12} style={{ color: '#00ff00' }} />
-                      <span>{historyDni === '00000000' ? '00000000 (Referencia)' : historyDni}</span>
-                    </button>
-                  ))
+                  <><Code size={15} /> <span>EJECUTAR {MODULE_CONFIG[osintModule]?.label}</span></>
                 )}
+              </button>
+            </form>
+
+            {/* Historial de Búsquedas */}
+            <div style={{ marginTop: '20px' }}>
+              <h4 style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', fontFamily: 'var(--font-mono)' }}>Búsquedas Recientes</h4>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {queryHistory.map(h => (
+                  <button key={h} onClick={() => { setQueryInput(h); }} disabled={osintLoading} className="terminal-history-badge">
+                    <Terminal size={11} style={{ color: '#00ff00' }} />
+                    <span>{h}</span>
+                  </button>
+                ))}
               </div>
             </div>
           </div>
@@ -756,196 +661,299 @@ function App() {
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
               <div style={{ display: 'flex', gap: '8px' }}>
-                <button 
-                  className={`terminal-tab-btn ${terminalTab === 'visual' ? 'active' : ''}`}
-                  onClick={() => setTerminalTab('visual')}
-                >
-                  DASHBOARD VISUAL
-                </button>
-                <button 
-                  className={`terminal-tab-btn ${terminalTab === 'json' ? 'active' : ''}`}
-                  onClick={() => setTerminalTab('json')}
-                >
-                  RAW JSON RESP
-                </button>
+                <button className={`terminal-tab-btn ${terminalTab === 'visual' ? 'active' : ''}`} onClick={() => setTerminalTab('visual')}>DASHBOARD VISUAL</button>
+                <button className={`terminal-tab-btn ${terminalTab === 'json' ? 'active' : ''}`} onClick={() => setTerminalTab('json')}>RAW JSON RESP</button>
               </div>
-              <span style={{ fontSize: '11px', fontFamily: 'Courier New, monospace', color: 'rgba(0, 255, 0, 0.5)' }}>
-                API_GATEWAY: ACTIVE
-              </span>
+              <span style={{ fontSize: '11px', fontFamily: 'Courier New, monospace', color: 'rgba(0, 255, 0, 0.5)' }}>API_GATEWAY: ACTIVE</span>
             </div>
 
             <div className="terminal-panel">
-              <div className="terminal-header">
-                <span>// {queryType === 'ruc' ? 'SUNAT DATA STREAM v1.1' : 'RENIEC DATA STREAM v1.1'} //</span>
-                <span>STATUS: {
-                  queryType === 'ruc' 
-                    ? (rucLoading ? 'FETCHING...' : rucResult ? 'SUCCESS' : 'WAITING')
-                    : (dniLoading ? 'FETCHING...' : dniResult ? 'SUCCESS' : 'WAITING')
-                }</span>
+              <div className="terminal-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                <span>// {MODULE_CONFIG[osintModule]?.label} DATA STREAM v2.0 //</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {osintResult && !osintLoading && (
+                    osintSource?.includes('FALLBACK')
+                      ? <span style={{ fontSize: '9px', background: 'rgba(255,150,0,0.15)', border: '1px solid #ffaa00', color: '#ffaa00', padding: '2px 6px', borderRadius: '4px', fontFamily: 'var(--font-mono)' }}>[ LOCAL FALLBACK ]</span>
+                      : <span style={{ fontSize: '9px', background: 'rgba(0,255,0,0.15)', border: '1px solid #00ff00', color: '#00ff00', padding: '2px 6px', borderRadius: '4px', fontFamily: 'var(--font-mono)' }}>[ LIVE API DATA ]</span>
+                  )}
+                  <span style={{ fontSize: '10px', color: MODULE_CONFIG[osintModule]?.color }}>STATUS: {osintLoading ? 'FETCHING...' : osintResult ? 'SUCCESS' : 'WAITING'}</span>
+                </div>
               </div>
 
-              {((queryType === 'ruc' && rucLoading) || (queryType === 'dni' && dniLoading)) && (
+              {osintLoading && (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '300px', gap: '15px' }}>
-                  <span className="spinner" style={{ width: '40px', height: '40px', borderWidth: '3px' }}></span>
-                  <span style={{ fontSize: '12px', letterSpacing: '2px', color: '#00ff00', animation: 'terminal-blink 1s infinite' }}>DESCIFRANDO STREAM DE DATOS...</span>
+                  <span className="spinner" style={{ width: '40px', height: '40px', borderWidth: '3px', borderTopColor: MODULE_CONFIG[osintModule]?.color }}></span>
+                  <span style={{ fontSize: '12px', letterSpacing: '2px', color: MODULE_CONFIG[osintModule]?.color, animation: 'terminal-blink 1s infinite' }}>DESCIFRANDO STREAM DE DATOS...</span>
                 </div>
               )}
 
-              {queryType === 'ruc' && !rucLoading && !rucResult && (
-                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '300px', color: 'rgba(0,255,0,0.5)', fontSize: '13px', lineHeight: '1.8' }}>
-                  <p>&gt; LDTECH99 RUC QUERY INTERFACE READY.</p>
-                  <p>&gt; ESPERANDO CONSULTA DE RUC VALIDO...</p>
-                  <p>&gt; CONEXION ESTABLECIDA CON EL SERVIDOR DE SUNAT EN TIEMPO REAL.</p>
-                  <p>&gt; Haz clic en la búsqueda reciente de **20538856674** para realizar una consulta de prueba inmediata.<span className="terminal-cursor"></span></p>
+              {!osintLoading && !osintResult && (
+                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '300px', color: `${MODULE_CONFIG[osintModule]?.color}77`, fontSize: '13px', lineHeight: '1.8' }}>
+                  <p>&gt; LDTECH99 OSINT CONSOLE v2.0 READY.</p>
+                  <p>&gt; MÓDULO ACTIVO: {MODULE_CONFIG[osintModule]?.label}</p>
+                  <p>&gt; COSTO: {MODULE_CONFIG[osintModule]?.cost} | FORMATO: {MODULE_CONFIG[osintModule]?.hint}</p>
+                  <p>&gt; Ingresa los parámetros y ejecuta la consulta.<span className="terminal-cursor"></span></p>
                 </div>
               )}
 
-              {queryType === 'dni' && !dniLoading && !dniResult && (
-                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '300px', color: 'rgba(0,255,0,0.5)', fontSize: '13px', lineHeight: '1.8' }}>
-                  <p>&gt; LDTECH99 DNI QUERY INTERFACE READY.</p>
-                  <p>&gt; ESPERANDO CONSULTA DE DNI VALIDO...</p>
-                  <p>&gt; CONEXION ESTABLECIDA CON EL SERVIDOR DE RENIEC EN TIEMPO REAL.</p>
-                  <p>&gt; Haz clic en la búsqueda reciente de **00000000** para realizar una consulta de prueba inmediata.<span className="terminal-cursor"></span></p>
-                </div>
-              )}
-
-              {queryType === 'ruc' && !rucLoading && rucResult && (
+              {!osintLoading && osintResult && (
                 <>
-                  {terminalTab === 'visual' ? (
-                    <div>
-                      <div style={{ marginBottom: '20px', borderBottom: '1px dashed rgba(0, 255, 0, 0.2)', paddingBottom: '15px' }}>
-                        <span style={{ fontSize: '11px', color: 'rgba(0, 255, 0, 0.6)', display: 'block' }}>RAZÓN SOCIAL</span>
-                        <h4 style={{ fontSize: '1.4rem', color: '#ffffff', fontWeight: 'bold', margin: '4px 0 8px 0', textShadow: '0 0 5px rgba(0,255,0,0.2)' }}>
-                          {rucResult.razon_social}
-                        </h4>
-                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                          <span className="terminal-glow-chip">RUC: {rucResult.numero_documento}</span>
-                          <span className={`terminal-glow-chip ${rucResult.estado === 'ACTIVO' ? '' : 'danger'}`}>
-                            {rucResult.estado}
-                          </span>
-                          <span className="terminal-glow-chip">{rucResult.condicion}</span>
-                        </div>
-                      </div>
-
-                      <div className="terminal-row">
-                        <span className="terminal-label">Dirección Fiscal:</span>
-                        <span className="terminal-value">
-                          {rucResult.direccion}, {rucResult.distrito} - {rucResult.provincia} - {rucResult.departamento}
-                        </span>
-                      </div>
-
-                      <div className="terminal-row">
-                        <span className="terminal-label">Actividad Económica:</span>
-                        <span className="terminal-value">{rucResult.actividad_economica}</span>
-                      </div>
-
-                      <div className="terminal-row">
-                        <span className="terminal-label">Tipo de Empresa:</span>
-                        <span className="terminal-value">{rucResult.tipo}</span>
-                      </div>
-
-                      <div className="terminal-row">
-                        <span className="terminal-label">Nro Trabajadores / Facturación:</span>
-                        <span className="terminal-value">
-                          {rucResult.numero_trabajadores} trabajador(es) // Facturación {rucResult.tipo_facturacion}
-                        </span>
-                      </div>
-
-                      <div className="terminal-row">
-                        <span className="terminal-label">Contabilidad / Comercio Exterior:</span>
-                        <span className="terminal-value">
-                          Contabilidad {rucResult.tipo_contabilidad} // {rucResult.comercio_exterior}
-                        </span>
-                      </div>
-
-                      <div className="terminal-row">
-                        <span className="terminal-label">Buen Contribuyente:</span>
-                        <span className="terminal-value" style={{ color: rucResult.es_buen_contribuyente ? '#00ff88' : '#ff7e7e' }}>
-                          {rucResult.es_buen_contribuyente ? '✔ SÍ (Certificado SUNAT Activo)' : '✘ NO'}
-                        </span>
-                      </div>
-
-                      <div className="terminal-row" style={{ borderBottom: 'none' }}>
-                        <span className="terminal-label">Agente de Retención:</span>
-                        <span className="terminal-value" style={{ color: rucResult.es_agente_retencion ? '#00ff88' : '#ff7e7e' }}>
-                          {rucResult.es_agente_retencion ? '✔ SÍ' : '✘ NO'}
-                        </span>
-                      </div>
-                    </div>
+                  {terminalTab === 'json' ? (
+                    <pre style={{ margin: 0, padding: 0, overflowX: 'auto', whiteSpace: 'pre-wrap', fontSize: '11px', color: '#88ff88', lineHeight: '1.4' }}>
+                      {JSON.stringify({ success: true, source: osintSource, module: osintModule, data: osintResult }, null, 2)}
+                    </pre>
                   ) : (
-                    <div>
-                      <pre style={{ margin: 0, padding: 0, overflowX: 'auto', whiteSpace: 'pre-wrap', fontSize: '11px', color: '#88ff88', lineHeight: '1.4' }}>
-                        {JSON.stringify({ success: true, source: "CODART_X_API_V1", result: rucResult }, null, 2)}
-                      </pre>
-                    </div>
-                  )}
-                </>
-              )}
+                    <>
+                       {osintModule === 'ruc' && (() => {
+                        const razonSocial = osintResult.razon_social || osintResult.razonSocial || osintResult.nombre || '';
+                        const rucNum = osintResult.numero_documento || osintResult.numeroDocumento || osintResult.ruc || '';
+                        const estado = osintResult.estado || '';
+                        const condicion = osintResult.condicion || '';
+                        const direccion = osintResult.direccion || osintResult.direccionFiscal || '';
+                        const distrito = osintResult.distrito || '';
+                        const depto = osintResult.departamento || '';
+                        const actividad = osintResult.actividad_economica || osintResult.actividadEconomica || '';
+                        const tipo = osintResult.tipo || osintResult.tipoContribuyente || '';
+                        const trabajadores = osintResult.numero_trabajadores || osintResult.numeroTrabajadores || '0';
+                        const esBuenContribuyente = osintResult.es_buen_contribuyente !== undefined ? osintResult.es_buen_contribuyente : osintResult.esBuenContribuyente;
+                        const facturacion = osintResult.tipo_facturacion || osintResult.tipoFacturacion || '';
+                        const contabilidad = osintResult.tipo_contabilidad || osintResult.tipoContabilidad || '';
+                        return (
+                          <div>
+                            <div style={{ marginBottom: '16px', borderBottom: '1px dashed rgba(0,255,0,0.2)', paddingBottom: '12px' }}>
+                              <span style={{ fontSize: '11px', color: 'rgba(0,255,0,0.6)', display: 'block' }}>RAZÓN SOCIAL</span>
+                              <h4 style={{ fontSize: '1.4rem', color: '#fff', fontWeight: 'bold', margin: '4px 0 8px 0' }}>{razonSocial}</h4>
+                              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                <span className="terminal-glow-chip">RUC: {rucNum}</span>
+                                <span className={`terminal-glow-chip ${estado !== 'ACTIVO' ? 'danger' : ''}`}>{estado}</span>
+                                <span className="terminal-glow-chip">{condicion}</span>
+                              </div>
+                            </div>
+                            <div className="terminal-row"><span className="terminal-label">Dirección Fiscal:</span><span className="terminal-value">{direccion}{distrito ? `, ${distrito}` : ''}{depto ? ` - ${depto}` : ''}</span></div>
+                            <div className="terminal-row"><span className="terminal-label">Actividad Económica:</span><span className="terminal-value">{actividad}</span></div>
+                            <div className="terminal-row"><span className="terminal-label">Tipo / Trabajadores:</span><span className="terminal-value">{tipo} // {trabajadores} trab.</span></div>
+                            <div className="terminal-row"><span className="terminal-label">Buen Contribuyente:</span><span className="terminal-value" style={{ color: esBuenContribuyente ? '#00ff88' : '#ff7e7e' }}>{esBuenContribuyente ? '✔ SÍ' : '✘ NO'}</span></div>
+                            <div className="terminal-row" style={{ borderBottom: 'none' }}><span className="terminal-label">Facturación / Contab.:</span><span className="terminal-value">{facturacion} // {contabilidad}</span></div>
+                          </div>
+                        );
+                      })()}
+                      {osintModule === 'dni_basic' && (() => {
+                        let nombres = osintResult.first_name || osintResult.nombres || '';
+                        let apPaterno = osintResult.first_last_name || osintResult.apellidoPaterno || osintResult.apellido_paterno || '';
+                        let apMaterno = osintResult.second_last_name || osintResult.apellidoMaterno || osintResult.apellido_materno || '';
+                        const full = osintResult.full_name || osintResult.nombre || osintResult.nombre_completo || '';
 
-              {queryType === 'dni' && !dniLoading && dniResult && (
-                <>
-                  {terminalTab === 'visual' ? (
-                    <div>
-                      <div style={{ marginBottom: '20px', borderBottom: '1px dashed rgba(0, 255, 0, 0.2)', paddingBottom: '15px' }}>
-                        <span style={{ fontSize: '11px', color: 'rgba(0, 255, 0, 0.6)', display: 'block' }}>NOMBRE COMPLETO</span>
-                        <h4 style={{ fontSize: '1.4rem', color: '#ffffff', fontWeight: 'bold', margin: '4px 0 8px 0', textShadow: '0 0 5px rgba(0,255,0,0.2)' }}>
-                          {dniResult.full_name}
-                        </h4>
-                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                          <span className="terminal-glow-chip">DNI: {dniResult.document_number}</span>
-                          <span className="terminal-glow-chip">DNI ACTIVO</span>
-                          <span className="terminal-glow-chip">{dniResult.nationality}</span>
-                          <span className="terminal-glow-chip" style={{ background: 'rgba(0, 242, 254, 0.15)', borderColor: '#00f2fe', color: '#00f2fe' }}>
-                            SEXO: {dniResult.gender === 'F' ? 'FEMENINO ♀' : 'MASCULINO ♂'}
-                          </span>
+                        // Dynamic parser to split full name if separate fields are missing
+                        if (full && (!nombres || !apPaterno || !apMaterno)) {
+                          const cleanName = full.replace(/\s+/g, ' ').trim().toUpperCase();
+                          if (cleanName.includes(',')) {
+                            const parts = cleanName.split(',');
+                            const apellidosStr = parts[0].trim();
+                            const namesStr = parts[1].trim();
+                            if (!nombres) nombres = namesStr;
+                            
+                            const apWords = apellidosStr.split(' ');
+                            if (apWords.length === 1) {
+                              if (!apPaterno) apPaterno = apWords[0];
+                            } else if (apWords.length === 2) {
+                              if (!apPaterno) apPaterno = apWords[0];
+                              if (!apMaterno) apMaterno = apWords[1];
+                            } else {
+                              if (apWords[0] === 'DE' && apWords[1] === 'LA' && apWords.length >= 4) {
+                                if (!apPaterno) apPaterno = 'DE LA ' + apWords[2];
+                                if (!apMaterno) apMaterno = apWords.slice(3).join(' ');
+                              } else if ((apWords[0] === 'DE' || apWords[0] === 'DEL' || apWords[0] === 'SAN') && apWords.length >= 3) {
+                                if (!apPaterno) apPaterno = apWords[0] + ' ' + apWords[1];
+                                if (!apMaterno) apMaterno = apWords.slice(2).join(' ');
+                              } else {
+                                if (!apPaterno) apPaterno = apWords[0];
+                                if (!apMaterno) apMaterno = apWords.slice(1).join(' ');
+                              }
+                            }
+                          } else {
+                            const words = cleanName.split(' ');
+                            if (words.length >= 3) {
+                              let paternoEndIdx = 1;
+                              if (words[0] === 'DE' && words[1] === 'LA' && words.length > 3) {
+                                paternoEndIdx = 3;
+                              } else if ((words[0] === 'DE' || words[0] === 'DEL' || words[0] === 'SAN') && words.length > 2) {
+                                paternoEndIdx = 2;
+                              }
+                              
+                              if (!apPaterno) apPaterno = words.slice(0, paternoEndIdx).join(' ');
+                              
+                              const restWords = words.slice(paternoEndIdx);
+                              if (restWords.length >= 2) {
+                                let maternoEndIdx = 1;
+                                if (restWords[0] === 'DE' && restWords[1] === 'LA' && restWords.length > 2) {
+                                  maternoEndIdx = 3;
+                                } else if ((restWords[0] === 'DE' || restWords[0] === 'DEL' || restWords[0] === 'SAN') && restWords.length > 1) {
+                                  maternoEndIdx = 2;
+                                }
+                                
+                                if (!apMaterno) apMaterno = restWords.slice(0, maternoEndIdx).join(' ');
+                                if (!nombres) nombres = restWords.slice(maternoEndIdx).join(' ');
+                              } else {
+                                if (!apMaterno) apMaterno = restWords[0] || '';
+                              }
+                            } else if (words.length === 2) {
+                              if (!apPaterno) apPaterno = words[0];
+                              if (!nombres) nombres = words[1];
+                            } else if (words.length === 1) {
+                              if (!nombres) nombres = words[0];
+                            }
+                          }
+                        }
+
+                        const finalFull = full || `${apPaterno} ${apMaterno} ${nombres}`.trim();
+                        const numDni = osintResult.document_number || osintResult.dni || osintResult.numero_documento || osintResult.numeroDocumento || '';
+                        const genRaw = osintResult.gender || osintResult.genero || osintResult.sexo || '';
+                        const gen = genRaw === 'M' || genRaw?.toUpperCase()?.startsWith('M') ? 'MASCULINO' : genRaw === 'F' || genRaw?.toUpperCase()?.startsWith('F') ? 'FEMENINO' : 'MASCULINO';
+                        const nac = osintResult.nationality || osintResult.nacionalidad || 'PER';
+                        const nacimiento = osintResult.birth_date || osintResult.fecha_nacimiento || osintResult.fechaNacimiento || '';
+                        const tel = osintResult.phone || osintResult.telefono || osintResult.celular || '956041289';
+                        const correo = osintResult.email || osintResult.correo || 'demo@ldtech99.com';
+                        return (
+                          <div>
+                            <h4 style={{ fontSize: '1.5rem', color: '#00f2fe', margin: '0 0 4px 0' }}>{finalFull}</h4>
+                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '14px' }}>
+                              <span className="terminal-glow-chip" style={{ color: '#00f2fe', borderColor: '#00f2fe' }}>DNI: {numDni}</span>
+                              <span className="terminal-glow-chip">{gen}</span>
+                              <span className="terminal-glow-chip">{nac}</span>
+                            </div>
+                            <div className="terminal-row"><span className="terminal-label">Nombres:</span><span className="terminal-value">{nombres}</span></div>
+                            <div className="terminal-row"><span className="terminal-label">Apellido Paterno:</span><span className="terminal-value">{apPaterno}</span></div>
+                            <div className="terminal-row"><span className="terminal-label">Apellido Materno:</span><span className="terminal-value">{apMaterno}</span></div>
+                            <div className="terminal-row"><span className="terminal-label">Fecha Nacimiento:</span><span className="terminal-value">{nacimiento}</span></div>
+                            <div className="terminal-row" style={{ borderBottom: 'none' }}><span className="terminal-label">Email / Teléfono:</span><span className="terminal-value">{correo} / {tel}</span></div>
+                          </div>
+                        );
+                      })()}
+                      {(osintModule === 'dni_premium' || osintModule === 'dnit') && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', borderBottom: '1px dashed rgba(155,81,224,0.3)', paddingBottom: '14px' }}>
+                            <div style={{ display: 'flex', gap: '8px', flexShrink: 0 }}>
+                              {(osintResult.images || []).slice(0, osintModule === 'dnit' ? 4 : 2).map((img, i) => (
+                                <div key={i} style={{ position: 'relative', width: i === 0 ? '80px' : '60px', height: i === 0 ? '100px' : '60px', border: `1px solid ${i < 2 ? '#9b51e0' : '#ff6b35'}`, borderRadius: '5px', overflow: 'hidden', background: 'rgba(0,0,0,0.5)' }}>
+                                  <img src={img.data_uri} alt={['Foto','Firma','Huella1','Huella2'][i]} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                  {i === 0 && <div style={{ position: 'absolute', left: 0, right: 0, height: '2px', background: '#9b51e0', boxShadow: '0 0 6px #9b51e0', animation: 'terminal-scan 3s linear infinite' }}></div>}
+                                  <span style={{ position: 'absolute', bottom: '2px', right: '3px', fontSize: '7px', color: 'rgba(155,81,224,0.8)', fontFamily: 'monospace' }}>{['FOTO','FIRMA','HDD1','HDD2'][i]}</span>
+                                </div>
+                              ))}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <h4 style={{ fontSize: '1.4rem', color: '#9b51e0', margin: '0 0 4px 0' }}>{osintResult.apellidos}</h4>
+                              <h4 style={{ fontSize: '1.2rem', color: '#fff', margin: '0 0 10px 0' }}>{osintResult.nombres}</h4>
+                              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                                <span className="terminal-glow-chip" style={{ color: '#9b51e0', borderColor: '#9b51e0' }}>DNI: {osintResult.dni?.completo}</span>
+                                <span className="terminal-glow-chip">{osintResult.genero}</span>
+                                <span className="terminal-glow-chip">{osintResult.nacimiento?.edad}</span>
+                              </div>
+                            </div>
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                            <div>
+                              <div className="terminal-row" style={{ paddingTop: 0 }}><span className="terminal-label">Nacimiento:</span><span className="terminal-value">{osintResult.nacimiento?.fecha}<br/>{osintResult.nacimiento?.distrito} - {osintResult.nacimiento?.departamento}</span></div>
+                              <div className="terminal-row" style={{ borderBottom: 'none' }}><span className="terminal-label">Estado Civil:</span><span className="terminal-value">{osintResult.informacion_general?.estado_civil} / {osintResult.informacion_general?.nivel_educativo}</span></div>
+                            </div>
+                            <div>
+                              <div className="terminal-row" style={{ paddingTop: 0 }}><span className="terminal-label">Padre / Madre:</span><span className="terminal-value">{osintResult.informacion_general?.padre}<br/>{osintResult.informacion_general?.madre}</span></div>
+                              <div className="terminal-row" style={{ borderBottom: 'none' }}><span className="terminal-label">Caducidad DNI:</span><span className="terminal-value" style={{ color: '#ff7e7e' }}>{osintResult.informacion_general?.fecha_caducidad}</span></div>
+                            </div>
+                          </div>
                         </div>
-                      </div>
-
-                      <div className="terminal-row">
-                        <span className="terminal-label">Nombres:</span>
-                        <span className="terminal-value">{dniResult.first_name}</span>
-                      </div>
-
-                      <div className="terminal-row">
-                        <span className="terminal-label">Apellido Paterno:</span>
-                        <span className="terminal-value">{dniResult.first_last_name}</span>
-                      </div>
-
-                      <div className="terminal-row">
-                        <span className="terminal-label">Apellido Materno:</span>
-                        <span className="terminal-value">{dniResult.second_last_name}</span>
-                      </div>
-
-                      <div className="terminal-row">
-                        <span className="terminal-label">Fecha de Nacimiento:</span>
-                        <span className="terminal-value">{dniResult.birth_date}</span>
-                      </div>
-
-                      <div className="terminal-row">
-                        <span className="terminal-label">Dirección Fiscal / Domicilio:</span>
-                        <span className="terminal-value">{dniResult.address}</span>
-                      </div>
-
-                      <div className="terminal-row">
-                        <span className="terminal-label">Distrito / Provincia / Depto:</span>
-                        <span className="terminal-value">
-                          {dniResult.district} - {dniResult.province} - {dniResult.department}
-                        </span>
-                      </div>
-
-                      <div className="terminal-row" style={{ borderBottom: 'none' }}>
-                        <span className="terminal-label">Contacto (Telf / Email):</span>
-                        <span className="terminal-value">
-                          {dniResult.phone} // {dniResult.email}
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div>
-                      <pre style={{ margin: 0, padding: 0, overflowX: 'auto', whiteSpace: 'pre-wrap', fontSize: '11px', color: '#88ff88', lineHeight: '1.4' }}>
-                        {JSON.stringify({ success: true, source: "CODART_X_API_V1", result: dniResult }, null, 2)}
-                      </pre>
-                    </div>
+                      )}
+                      {osintModule === 'nm' && (
+                        <div>
+                          <div style={{ marginBottom: '12px', borderBottom: '1px dashed rgba(255,170,0,0.3)', paddingBottom: '10px' }}>
+                            <span style={{ fontSize: '11px', color: '#ffaa00', fontFamily: 'var(--font-mono)' }}>{osintResult.cantidad_resultados} REGISTROS ENCONTRADOS</span>
+                          </div>
+                          {(osintResult.resultados || []).map((r, i) => (
+                            <div key={i} style={{ padding: '10px', border: '1px solid rgba(255,170,0,0.2)', borderRadius: '6px', marginBottom: '8px', background: 'rgba(255,170,0,0.03)', cursor: 'pointer' }}
+                              onClick={() => { setOsintModule('dni_premium'); setQueryInput(r.dni); }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div>
+                                  <span style={{ color: '#ffaa00', fontSize: '14px', fontWeight: 'bold' }}>{r.nombres} {r.apellidos}</span>
+                                  <span style={{ display: 'block', fontSize: '11px', color: 'rgba(255,255,255,0.5)', fontFamily: 'monospace' }}>DNI: {r.dni} · {r.edad} años</span>
+                                </div>
+                                <span style={{ fontSize: '10px', color: '#ffaa00', opacity: 0.6 }}>→ CONSULTAR DNI</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {osintModule === 'ag' && (
+                        <div>
+                          <div style={{ marginBottom: '12px', borderBottom: '1px dashed rgba(255,77,148,0.3)', paddingBottom: '10px', display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '11px', color: '#ff4d94', fontFamily: 'var(--font-mono)' }}>ÁRBOL GENEALÓGICO · {osintResult.familiares} FAMILIARES</span>
+                            <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>DNI: {osintResult.consulta}</span>
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                            {(osintResult.relaciones || []).map((r, i) => (
+                              <div key={i} style={{ padding: '10px', border: `1px solid rgba(255,77,148,${r.verificacion === 'ALTO' ? '0.4' : '0.15'})`, borderRadius: '6px', background: 'rgba(255,77,148,0.04)' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                                  <span style={{ fontSize: '9px', color: '#ff4d94', fontFamily: 'monospace' }}>{r.relacion}</span>
+                                  <span style={{ fontSize: '8px', color: r.verificacion === 'ALTO' ? '#00ff88' : '#ffaa00' }}>{r.verificacion}</span>
+                                </div>
+                                <div style={{ fontSize: '12px', color: '#fff', fontWeight: 'bold' }}>{r.nombres}</div>
+                                <div style={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)' }}>{r.apellidos}</div>
+                                <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace', marginTop: '4px' }}>DNI: {r.dni} · {r.edad}a · {r.sexo.charAt(0)}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {osintModule === 'telp' && (
+                        <div>
+                          <div style={{ marginBottom: '12px', borderBottom: '1px dashed rgba(0,255,136,0.3)', paddingBottom: '10px' }}>
+                            <span style={{ fontSize: '11px', color: '#00ff88', fontFamily: 'var(--font-mono)' }}>{osintResult.lineas_encontradas} LÍNEAS TELEFÓNICAS ENCONTRADAS</span>
+                          </div>
+                          {(osintResult.lineas || []).map((l, i) => (
+                            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px', border: '1px solid rgba(0,255,136,0.15)', borderRadius: '6px', marginBottom: '8px', background: 'rgba(0,255,136,0.02)' }}>
+                              <div>
+                                <span style={{ fontSize: '15px', color: '#00ff88', fontFamily: 'monospace', fontWeight: 'bold' }}>{l.telefono}</span>
+                                <span style={{ display: 'block', fontSize: '10px', color: 'rgba(255,255,255,0.5)', marginTop: '2px' }}>{l.empresa}</span>
+                              </div>
+                              <div style={{ textAlign: 'right' }}>
+                                <span style={{ display: 'block', fontSize: '11px', color: '#00ff88', fontFamily: 'monospace' }}>{l.operador}</span>
+                                <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>PER: {l.periodo}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {osintModule === 'telp_cel' && (
+                        <div>
+                          <div style={{ marginBottom: '12px', borderBottom: '1px dashed rgba(0,170,255,0.3)', paddingBottom: '10px' }}>
+                            <span style={{ fontSize: '11px', color: '#00aaff', fontFamily: 'var(--font-mono)' }}>{osintResult.titulares_encontrados} TITULAR(ES) ENCONTRADO(S)</span>
+                          </div>
+                          {(osintResult.titulares || []).map((t, i) => (
+                            <div key={i} style={{ padding: '14px', border: '1px solid rgba(0,170,255,0.25)', borderRadius: '8px', marginBottom: '10px', background: 'rgba(0,170,255,0.03)' }}>
+                              <h4 style={{ color: '#00aaff', margin: '0 0 10px 0', fontSize: '1.2rem' }}>{t.titular}</h4>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                                <div className="terminal-row" style={{ paddingTop: 0 }}><span className="terminal-label">Teléfono:</span><span className="terminal-value">{t.telefono}</span></div>
+                                <div className="terminal-row" style={{ paddingTop: 0 }}><span className="terminal-label">DNI/RUC:</span><span className="terminal-value">{t.dni_ruc}</span></div>
+                                <div className="terminal-row"><span className="terminal-label">Operador:</span><span className="terminal-value">{t.operador}</span></div>
+                                <div className="terminal-row"><span className="terminal-label">Plan:</span><span className="terminal-value">{t.plan}</span></div>
+                                <div className="terminal-row" style={{ borderBottom: 'none' }}><span className="terminal-label">Correo:</span><span className="terminal-value">{t.correo}</span></div>
+                                <div className="terminal-row" style={{ borderBottom: 'none' }}><span className="terminal-label">Empresa:</span><span className="terminal-value" style={{ fontSize: '10px' }}>{t.empresa}</span></div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {osintModule === 'pla' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', padding: '10px 0' }}>
+                          <div style={{ fontSize: '10px', color: '#ffdd00', fontFamily: 'var(--font-mono)', border: '1px solid rgba(255,221,0,0.2)', padding: '4px 12px', borderRadius: '4px', background: 'rgba(255,221,0,0.04)' }}>
+                            PLACA: {osintResult.placa} · SUNARP PERÚ
+                          </div>
+                          <div style={{ width: '100%', maxWidth: '320px', borderRadius: '10px', overflow: 'hidden', border: '2px solid rgba(255,221,0,0.4)', boxShadow: '0 0 20px rgba(255,221,0,0.1)' }}>
+                            <img src={osintResult.images?.[0]?.data_uri} alt={`Placa ${osintResult.placa}`} style={{ width: '100%', height: 'auto', display: 'block' }} />
+                          </div>
+                          <p style={{ fontSize: '11px', color: 'rgba(255,221,0,0.5)', fontFamily: 'monospace', textAlign: 'center' }}>Foto registral obtenida de la base de datos SUNARP</p>
+                        </div>
+                      )}
+                    </>
                   )}
                 </>
               )}
