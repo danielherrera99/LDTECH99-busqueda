@@ -87,7 +87,7 @@ export const sunatService = {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       };
-      const actualToken = token || localStorage.getItem('sunat_token') || 'mkP2mNY8qlrcUC5Y0W9ycNWbfUDPelP3caquQFmDNyUt7P5QKULQfyaybHtr';
+      const actualToken = token || localStorage.getItem('sunat_token') || 'vSJR6tai39CnDrdZ4EOamF3Dzi172ktDBfO46B2E81wVB78RSHx925rydyRW';
       if (actualToken) {
         headers['Authorization'] = `Bearer ${actualToken}`;
       }
@@ -202,7 +202,7 @@ export const reniecService = {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       };
-      const actualToken = token || localStorage.getItem('sunat_token') || 'mkP2mNY8qlrcUC5Y0W9ycNWbfUDPelP3caquQFmDNyUt7P5QKULQfyaybHtr';
+      const actualToken = token || localStorage.getItem('sunat_token') || 'vSJR6tai39CnDrdZ4EOamF3Dzi172ktDBfO46B2E81wVB78RSHx925rydyRW';
       if (actualToken) {
         headers['Authorization'] = `Bearer ${actualToken}`;
       }

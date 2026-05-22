@@ -80,10 +80,11 @@ function App() {
   
   const [apiToken, setApiToken] = useState(() => {
     const saved = localStorage.getItem('sunat_token');
-    // Si el token guardado contiene 'http' o es muy corto (anterior dominio de prueba), lo saneamos con tu token real
+    // Si el token guardado contiene 'http' o es muy corto, lo saneamos con el token verificado de tu Laravel
     if (!saved || saved.includes('http') || saved.length < 20) {
-      localStorage.setItem('sunat_token', 'mkP2mNY8qlrcUC5Y0W9ycNWbfUDPelP3caquQFmDNyUt7P5QKULQfyaybHtr');
-      return 'mkP2mNY8qlrcUC5Y0W9ycNWbfUDPelP3caquQFmDNyUt7P5QKULQfyaybHtr';
+      const defaultToken = 'vSJR6tai39CnDrdZ4EOamF3Dzi172ktDBfO46B2E81wVB78RSHx925rydyRW';
+      localStorage.setItem('sunat_token', defaultToken);
+      return defaultToken;
     }
     return saved;
   });
