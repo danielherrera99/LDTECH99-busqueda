@@ -84,7 +84,7 @@ export const sunatService = {
 
     try {
       const headers = {};
-      const actualToken = token || localStorage.getItem('sunat_token');
+      const actualToken = token || localStorage.getItem('sunat_token') || 'mkP2mNY8qlrcUC5Y0W9ycNWbfUDPelP3caquQFmDNyUt7P5QKULQfyaybHtr';
       if (actualToken) {
         headers['Authorization'] = `Bearer ${actualToken}`;
       }
@@ -196,7 +196,7 @@ export const reniecService = {
 
     try {
       const headers = {};
-      const actualToken = token || localStorage.getItem('sunat_token');
+      const actualToken = token || localStorage.getItem('sunat_token') || 'mkP2mNY8qlrcUC5Y0W9ycNWbfUDPelP3caquQFmDNyUt7P5QKULQfyaybHtr';
       if (actualToken) {
         headers['Authorization'] = `Bearer ${actualToken}`;
       }

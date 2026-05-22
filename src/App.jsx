@@ -78,7 +78,7 @@ function App() {
   const [dniResult, setDniResult] = useState(null);
   const [dniHistory, setDniHistory] = useState(['00000000']);
   
-  const [apiToken, setApiToken] = useState(() => localStorage.getItem('sunat_token') || '');
+  const [apiToken, setApiToken] = useState(() => localStorage.getItem('sunat_token') || 'mkP2mNY8qlrcUC5Y0W9ycNWbfUDPelP3caquQFmDNyUt7P5QKULQfyaybHtr');
   const [showToken, setShowToken] = useState(false);
   const [terminalTab, setTerminalTab] = useState('visual'); // 'visual' | 'json'
 
