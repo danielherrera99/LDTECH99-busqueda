@@ -109,7 +109,18 @@ function App() {
     } catch (e) {
       console.warn('[HISTORY INIT]', e);
     }
-    return ['20538856674', '00000000'];
+    return [{ query: '20538856674', module: 'ruc' }, { query: '00000000', module: 'dni_basic' }];
+  });
+
+  // Estado para cachear la información completa de las consultas
+  const [resultsCache, setResultsCache] = useState(() => {
+    try {
+      const saved = localStorage.getItem('osint_results_cache');
+      return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+      console.warn('[CACHE INIT]', e);
+      return {};
+    }
   });
 
   // Compatibilidad retroactiva (alias)
@@ -156,8 +167,9 @@ function App() {
   };
 
   // ─── Manejador OSINT unificado (9 módulos) ──────────────────────────────────
-  const handleOsintSearch = async (e, customInput) => {
+  const handleOsintSearch = async (e, customInput, customModule, forceRefresh = false) => {
     if (e) e.preventDefault();
+    const activeModule = customModule || osintModule;
     const target = customInput || queryInput;
 
     setOsintError('');
@@ -165,8 +177,8 @@ function App() {
     setOsintSource('');
 
     // Validación por módulo
-    const cfg = MODULE_CONFIG[osintModule];
-    if (osintModule === 'nm') {
+    const cfg = MODULE_CONFIG[activeModule];
+    if (activeModule === 'nm') {
       if (!nmN1 || nmN1.length < 2) { setOsintError('Ingresa el primer nombre (mínimo 2 letras).'); return; }
       if (!nmAp1 || nmAp1.length < 2) { setOsintError('Ingresa el primer apellido (mínimo 2 letras).'); return; }
       if (!nmAp2 || nmAp2.length < 2) { setOsintError('Ingresa el segundo apellido (mínimo 2 letras).'); return; }
@@ -175,27 +187,59 @@ function App() {
       if (!cfg.validate.test(target.trim().toUpperCase())) { setOsintError(`Formato inválido. Se esperan: ${cfg.hint}.`); return; }
     }
 
+    // --- LÓGICA DE CACHE LOCAL ---
+    const cacheKey = `${activeModule}_${target.trim().toUpperCase()}`;
+    if (!forceRefresh && activeModule !== 'nm' && resultsCache[cacheKey]) {
+      // Cargamos de inmediato desde la caché local sin llamadas de red (0ms de latencia, 0 créditos consumidos)
+      setOsintResult(resultsCache[cacheKey].data);
+      setOsintSource('LOCAL_CACHE');
+      
+      // Ajustamos el estado visual de la UI al módulo guardado
+      if (customModule) setOsintModule(customModule);
+      if (customInput) setQueryInput(customInput);
+      return;
+    }
+
     setOsintLoading(true);
     try {
       let response;
       const mode = gatewayMode;
-      switch (osintModule) {
-        case 'ruc':         response = await sunatService.consultarRuc(target, apiToken, mode); break;
-        case 'dni_basic':   response = await reniecBasicService.consultarDni(target, apiToken, mode); break;
-        case 'dni_premium': response = await reniecService.consultarDni(target, apiToken, mode); break;
-        case 'dnit':        response = await dnitService.consultarDnit(target, apiToken, mode); break;
+      const cleanTarget = target.trim().toUpperCase();
+      switch (activeModule) {
+        case 'ruc':         response = await sunatService.consultarRuc(cleanTarget, apiToken, mode); break;
+        case 'dni_basic':   response = await reniecBasicService.consultarDni(cleanTarget, apiToken, mode); break;
+        case 'dni_premium': response = await reniecService.consultarDni(cleanTarget, apiToken, mode); break;
+        case 'dnit':        response = await dnitService.consultarDnit(cleanTarget, apiToken, mode); break;
         case 'nm':          response = await nmService.consultarNm({ n1: nmN1, ap1: nmAp1, ap2: nmAp2 }, apiToken, mode); break;
-        case 'ag':          response = await agService.consultarAg(target, apiToken, mode); break;
-        case 'telp':        response = await telpService.consultarTelp(target, apiToken, mode); break;
-        case 'telp_cel':    response = await telpCelService.consultarTelpCel(target, apiToken, mode); break;
-        case 'pla':         response = await plaService.consultarPla(target, apiToken, mode); break;
+        case 'ag':          response = await agService.consultarAg(cleanTarget, apiToken, mode); break;
+        case 'telp':        response = await telpService.consultarTelp(cleanTarget, apiToken, mode); break;
+        case 'telp_cel':    response = await telpCelService.consultarTelpCel(cleanTarget, apiToken, mode); break;
+        case 'pla':         response = await plaService.consultarPla(cleanTarget, apiToken, mode); break;
         default: throw new Error('Módulo no reconocido.');
       }
+      
       if (response.success) {
-        setOsintResult(response.data || response.result || response);
+        const resultData = response.data || response.result || response;
+        setOsintResult(resultData);
         setOsintSource(response.source || 'CODART_X_API_V1');
-        if (osintModule !== 'nm' && target && !queryHistory.includes(target)) {
-          setQueryHistory([target, ...queryHistory.slice(0, 6)]);
+        
+        // Guardamos en la base de datos de caché local y en el historial
+        if (activeModule !== 'nm' && target) {
+          const updatedCache = {
+            ...resultsCache,
+            [cacheKey]: {
+              module: activeModule,
+              source: response.source || 'CODART_X_API_V1',
+              data: resultData
+            }
+          };
+          setResultsCache(updatedCache);
+          localStorage.setItem('osint_results_cache', JSON.stringify(updatedCache));
+
+          // Actualizamos el historial unificado (objeto query + modulo)
+          const newEntry = { query: cleanTarget, module: activeModule };
+          const filtered = queryHistory.filter(h => !(h.query === cleanTarget && h.module === activeModule));
+          setQueryHistory([newEntry, ...filtered.slice(0, 9)]);
         }
       } else {
         setOsintError(response.message || 'La consulta no retornó resultados.');
@@ -687,10 +731,11 @@ function App() {
                 {queryHistory.length === 0 ? (
                   <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.2)', fontFamily: 'monospace' }}>NINGUNA CONSULTA RECIENTE</span>
                 ) : (
-                  queryHistory.map(h => (
-                    <button key={h} onClick={() => { setQueryInput(h); }} disabled={osintLoading} className="terminal-history-badge">
-                      <Terminal size={11} style={{ color: '#00ff00' }} />
-                      <span>{h}</span>
+                  queryHistory.map((h, idx) => (
+                    <button key={idx} onClick={() => { setOsintModule(h.module); setQueryInput(h.query); handleOsintSearch(null, h.query, h.module); }} disabled={osintLoading} className="terminal-history-badge">
+                      <Terminal size={11} style={{ color: MODULE_CONFIG[h.module]?.color || '#00ff00' }} />
+                      <span style={{ fontSize: '9px', opacity: 0.6, marginRight: '4px' }}>[{h.module.replace('_basic', '').toUpperCase()}]</span>
+                      <span>{h.query}</span>
                     </button>
                   ))
                 )}
@@ -713,9 +758,20 @@ function App() {
                 <span>// {MODULE_CONFIG[osintModule]?.label} DATA STREAM v2.0 //</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   {osintResult && !osintLoading && (
-                    osintSource?.includes('FALLBACK')
-                      ? <span style={{ fontSize: '9px', background: 'rgba(255,150,0,0.15)', border: '1px solid #ffaa00', color: '#ffaa00', padding: '2px 6px', borderRadius: '4px', fontFamily: 'var(--font-mono)' }}>[ LOCAL FALLBACK ]</span>
-                      : <span style={{ fontSize: '9px', background: 'rgba(0,255,0,0.15)', border: '1px solid #00ff00', color: '#00ff00', padding: '2px 6px', borderRadius: '4px', fontFamily: 'var(--font-mono)' }}>[ LIVE API DATA ]</span>
+                    osintSource === 'LOCAL_CACHE' ? (
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        <span style={{ fontSize: '9px', background: 'rgba(0,170,255,0.15)', border: '1px solid #00aaff', color: '#00aaff', padding: '2px 6px', borderRadius: '4px', fontFamily: 'var(--font-mono)' }}>[ LOCAL CACHE ]</span>
+                        <button type="button" onClick={(e) => handleOsintSearch(e, queryInput, osintModule, true)}
+                          style={{ background: 'rgba(255,0,0,0.1)', border: '1px solid rgba(255,0,0,0.3)', color: '#ff7e7e', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '8px', textTransform: 'uppercase', padding: '2px 6px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px' }}
+                          title="Volver a consultar la API en vivo para sobreescribir la caché">
+                          🔄 Recargar
+                        </button>
+                      </div>
+                    ) : osintSource?.includes('FALLBACK') ? (
+                      <span style={{ fontSize: '9px', background: 'rgba(255,150,0,0.15)', border: '1px solid #ffaa00', color: '#ffaa00', padding: '2px 6px', borderRadius: '4px', fontFamily: 'var(--font-mono)' }}>[ LOCAL FALLBACK ]</span>
+                    ) : (
+                      <span style={{ fontSize: '9px', background: 'rgba(0,255,0,0.15)', border: '1px solid #00ff00', color: '#00ff00', padding: '2px 6px', borderRadius: '4px', fontFamily: 'var(--font-mono)' }}>[ LIVE API DATA ]</span>
+                    )
                   )}
                   <span style={{ fontSize: '10px', color: MODULE_CONFIG[osintModule]?.color }}>STATUS: {osintLoading ? 'FETCHING...' : osintResult ? 'SUCCESS' : 'WAITING'}</span>
                 </div>
