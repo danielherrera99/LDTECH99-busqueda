@@ -32,7 +32,19 @@ const backendPost = async (path, body) => {
     headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`Error del servidor: código ${res.status}`);
+  if (!res.ok) {
+    try {
+      const errData = await res.json();
+      if (errData && errData.message) {
+        throw new Error(errData.message);
+      }
+    } catch (e) {
+      if (e.message && !e.message.includes('JSON')) {
+        throw e;
+      }
+    }
+    throw new Error(`Error del servidor: código ${res.status}`);
+  }
   return res.json();
 };
 
@@ -54,13 +66,23 @@ export const sunatService = {
         data = await backendPost('/consultas/ruc', { ruc });
       } else {
         const res = await fetch(`${CODART_DIRECT}/sunat/ruc/${ruc}`, { headers: directHeaders(token) });
-        if (!res.ok) throw new Error(`Error HTTP ${res.status}`);
+        if (!res.ok) {
+          try {
+            const errData = await res.json();
+            if (errData && errData.message) throw new Error(errData.message);
+          } catch(e) {}
+          throw new Error(`Error HTTP ${res.status}`);
+        }
         data = await res.json();
       }
       if (!data.success) throw new Error(data.message || 'Sin resultados para el RUC.');
       return data;
     } catch (err) {
       console.warn('[RUC FALLBACK]', err.message);
+      // Propagar errores críticos de cuota y credenciales para dar feedback al usuario
+      if (err.message.includes('Límite') || err.message.includes('Token') || err.message.includes('excedido') || err.message.includes('inválido')) {
+        throw err;
+      }
       await sleep(900);
       if (ruc === '20538856674') return { success: true, source: 'LOCAL_FALLBACK', result: { razon_social: 'ARTROSCOPICTRAUMA S.A.C.', tipo_documento: '6', numero_documento: '20538856674', estado: 'ACTIVO', condicion: 'HABIDO', direccion: 'AV. GRAL.GARZON NRO 2320 URB. FUNDO OYAGUE', ubigeo: '150113', via_tipo: 'AV.', via_nombre: 'GRAL.GARZON', zona_codigo: 'URB.', zona_tipo: 'FUNDO OYAGUE', numero: '2320', interior: '-', lote: '-', dpto: '-', manzana: '-', kilometro: '-', distrito: 'JESUS MARIA', provincia: 'LIMA', departamento: 'LIMA', es_agente_retencion: false, es_buen_contribuyente: true, locales_anexos: null, tipo: 'SOCIEDAD ANONIMA CERRADA', actividad_economica: 'OTRAS ACTIVIDADES DE ATENCION DE LA SALUD HUMANA', numero_trabajadores: '1', tipo_facturacion: 'MANUAL', tipo_contabilidad: 'MANUAL', comercio_exterior: 'SIN ACTIVIDAD' } };
       return { success: true, source: 'LOCAL_FALLBACK', result: { razon_social: `EMPRESA DEMO S.A.C. (${ruc})`, tipo_documento: '6', numero_documento: ruc, estado: 'ACTIVO', condicion: 'HABIDO', direccion: 'AV. TECNOLOGIA NRO 999', ubigeo: '140101', via_tipo: 'AV.', via_nombre: 'TECNOLOGIA', zona_codigo: 'URB.', zona_tipo: 'SILICON VALLEY PERU', numero: '999', interior: '-', lote: '-', dpto: '-', manzana: '-', kilometro: '-', distrito: 'CHICLAYO', provincia: 'CHICLAYO', departamento: 'LAMBAYEQUE', es_agente_retencion: false, es_buen_contribuyente: true, locales_anexos: null, tipo: 'SOCIEDAD ANONIMA CERRADA', actividad_economica: 'DESARROLLO DE SOFTWARE Y TECNOLOGIA', numero_trabajadores: '10', tipo_facturacion: 'ELECTRONICA', tipo_contabilidad: 'COMPUTARIZADA', comercio_exterior: 'SIN ACTIVIDAD' } };
@@ -80,13 +102,23 @@ export const reniecBasicService = {
         data = await backendPost('/consultas/dni', { dni });
       } else {
         const res = await fetch(`${CODART_DIRECT}/reniec/dni/${dni}`, { headers: directHeaders(token) });
-        if (!res.ok) throw new Error(`Error HTTP ${res.status}`);
+        if (!res.ok) {
+          try {
+            const errData = await res.json();
+            if (errData && errData.message) throw new Error(errData.message);
+          } catch(e) {}
+          throw new Error(`Error HTTP ${res.status}`);
+        }
         data = await res.json();
       }
       if (!data.success) throw new Error(data.message || 'Sin resultados para el DNI.');
       return data;
     } catch (err) {
       console.warn('[DNI BASIC FALLBACK]', err.message);
+      // Propagar errores críticos de cuota y credenciales para dar feedback al usuario
+      if (err.message.includes('Límite') || err.message.includes('Token') || err.message.includes('excedido') || err.message.includes('inválido')) {
+        throw err;
+      }
       await sleep(800);
       return {
         success: true, source: 'LOCAL_FALLBACK',
