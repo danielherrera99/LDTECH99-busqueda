@@ -97,7 +97,20 @@ function App() {
   const [osintError, setOsintError] = useState('');
   const [osintResult, setOsintResult] = useState(null);
   const [osintSource, setOsintSource] = useState('');
-  const [queryHistory, setQueryHistory] = useState(['20538856674', '00000000']);
+  const [queryHistory, setQueryHistory] = useState(() => {
+    try {
+      const saved = localStorage.getItem('osint_query_history');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed;
+        }
+      }
+    } catch (e) {
+      console.warn('[HISTORY INIT]', e);
+    }
+    return ['20538856674', '00000000'];
+  });
 
   // Compatibilidad retroactiva (alias)
   const queryType    = osintModule === 'ruc' ? 'ruc' : 'dni';
@@ -213,6 +226,11 @@ function App() {
     };
     checkSession();
   }, []);
+
+  // --- Efecto para guardar el historial en localStorage ---
+  useEffect(() => {
+    localStorage.setItem('osint_query_history', JSON.stringify(queryHistory));
+  }, [queryHistory]);
 
   // --- Manejador del Login ---
   const handleLoginSubmit = async (e) => {
@@ -655,14 +673,27 @@ function App() {
 
             {/* Historial de Búsquedas */}
             <div style={{ marginTop: '20px' }}>
-              <h4 style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '10px', fontFamily: 'var(--font-mono)' }}>Búsquedas Recientes</h4>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                {queryHistory.map(h => (
-                  <button key={h} onClick={() => { setQueryInput(h); }} disabled={osintLoading} className="terminal-history-badge">
-                    <Terminal size={11} style={{ color: '#00ff00' }} />
-                    <span>{h}</span>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                <h4 style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', margin: 0, fontFamily: 'var(--font-mono)' }}>Búsquedas Recientes</h4>
+                {queryHistory.length > 0 && (
+                  <button type="button" onClick={() => setQueryHistory([])}
+                    style={{ background: 'none', border: 'none', color: 'rgba(255,0,0,0.5)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', padding: 0 }}
+                    title="Limpiar historial de consultas">
+                    [ Limpiar ]
                   </button>
-                ))}
+                )}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {queryHistory.length === 0 ? (
+                  <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.2)', fontFamily: 'monospace' }}>NINGUNA CONSULTA RECIENTE</span>
+                ) : (
+                  queryHistory.map(h => (
+                    <button key={h} onClick={() => { setQueryInput(h); }} disabled={osintLoading} className="terminal-history-badge">
+                      <Terminal size={11} style={{ color: '#00ff00' }} />
+                      <span>{h}</span>
+                    </button>
+                  ))
+                )}
               </div>
             </div>
           </div>
