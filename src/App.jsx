@@ -251,6 +251,448 @@ function App() {
     }
   };
 
+  const handleGeneratePDF = () => {
+    if (!osintResult) return;
+    
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      alert('Por favor, permite las ventanas emergentes (popups) para poder descargar el reporte PDF.');
+      return;
+    }
+    
+    let contentHtml = '';
+    const dateStr = new Date().toLocaleString('es-PE', { timeZone: 'America/Lima' });
+    
+    if (osintModule === 'ruc') {
+      const esAgenteRetencion = osintResult.es_agent_retencion !== undefined ? osintResult.es_agent_retencion : osintResult.es_agente_retencion;
+      const localesAnexos = osintResult.locales_anexos || osintResult.localesAnexos || 'Ninguno';
+      const comercioExterior = osintResult.comercio_exterior || osintResult.comercioExterior || 'Sin actividad';
+      const ubigeo = osintResult.ubigeo || '';
+      contentHtml = `
+        <div class="title-banner">
+          <h2>REPORTE OSINT: RUC SUNAT</h2>
+          <p style="margin: 4px 0 0 0; font-size: 12px; color: #4a5568;">Razón Social: <strong>${osintResult.razon_social || osintResult.razonSocial || osintResult.nombre || ''}</strong></p>
+        </div>
+        <div class="section-title">Información General de la Empresa</div>
+        <div class="grid">
+          <div class="row"><span class="label">RUC:</span><span class="value">${osintResult.numero_documento || osintResult.numeroDocumento || osintResult.ruc || ''}</span></div>
+          <div class="row"><span class="label">Estado Registral:</span><span class="value" style="font-weight:bold; color:${osintResult.estado === 'ACTIVO' ? '#00aa55' : '#e53e3e'}">${osintResult.estado || ''}</span></div>
+          <div class="row"><span class="label">Condición de Domicilio:</span><span class="value">${osintResult.condicion || ''}</span></div>
+          <div class="row"><span class="label">Tipo de Contribuyente:</span><span class="value">${osintResult.tipo || osintResult.tipoContribuyente || ''}</span></div>
+          <div class="row full-width"><span class="label">Dirección Fiscal:</span><span class="value">${osintResult.direccion || osintResult.direccionFiscal || ''} ${osintResult.distrito || ''} - ${osintResult.departamento || ''}</span></div>
+          <div class="row full-width"><span class="label">Actividad Económica:</span><span class="value">${osintResult.actividad_economica || osintResult.actividadEconomica || ''}</span></div>
+          <div class="row"><span class="label">Trabajadores Registrados:</span><span class="value">${osintResult.numero_trabajadores || osintResult.numeroTrabajadores || '0'}</span></div>
+          <div class="row"><span class="label">Buen Contribuyente:</span><span class="value">${osintResult.es_buen_contribuyente ? '✔ SÍ' : '✘ NO'}</span></div>
+          <div class="row"><span class="label">Facturación / Contabilidad:</span><span class="value">${osintResult.tipo_facturacion || ''} / ${osintResult.tipo_contabilidad || ''}</span></div>
+          <div class="row"><span class="label">Comercio Exterior:</span><span class="value">${comercioExterior}</span></div>
+          <div class="row"><span class="label">Agente de Retención:</span><span class="value">${esAgenteRetencion ? '✔ SÍ' : '✘ NO'}</span></div>
+          <div class="row"><span class="label">Locales Anexos:</span><span class="value">${!localesAnexos || localesAnexos === 'null' || localesAnexos === 'Ninguno' ? 'NINGUNO' : localesAnexos}</span></div>
+          <div class="row" style="border-bottom:none;"><span class="label">Ubigeo SUNAT:</span><span class="value">${ubigeo || 'NO REGISTRADO'}</span></div>
+        </div>
+      `;
+    } else if (osintModule === 'dni_basic') {
+      let nombres = osintResult.first_name || osintResult.nombres || '';
+      let apPaterno = osintResult.first_last_name || osintResult.apellidoPaterno || osintResult.apellido_paterno || '';
+      let apMaterno = osintResult.second_last_name || osintResult.apellidoMaterno || osintResult.apellido_materno || '';
+      let full = osintResult.full_name || osintResult.nombre || osintResult.nombre_completo || '';
+      if (!apPaterno && !apMaterno && nombres && nombres.trim().includes(' ')) {
+        full = nombres;
+        nombres = '';
+      }
+      const finalFull = full || `${apPaterno} ${apMaterno} ${nombres}`.trim();
+      const numDni = osintResult.document_number || osintResult.dni || osintResult.numero_documento || osintResult.numeroDocumento || '';
+      const genRaw = osintResult.gender || osintResult.genero || osintResult.sexo || '';
+      const gen = genRaw === 'M' || genRaw?.toUpperCase()?.startsWith('M') ? 'MASCULINO' : genRaw === 'F' || genRaw?.toUpperCase()?.startsWith('F') ? 'FEMENINO' : 'MASCULINO';
+      const nac = osintResult.nationality || osintResult.nacionalidad || 'PER';
+      const nacimiento = osintResult.birth_date || osintResult.fecha_nacimiento || osintResult.fechaNacimiento || '';
+      const tel = osintResult.phone || osintResult.telefono || osintResult.celular || '956041289';
+      const correo = osintResult.email || osintResult.correo || 'demo@ldtech99.com';
+      const direccion = osintResult.address || osintResult.direccion || '';
+      const distrito = osintResult.district || osintResult.distrito || '';
+      const provincia = osintResult.province || osintResult.provincia || '';
+      const departamento = osintResult.department || osintResult.departamento || '';
+      const ubigeoDomicilio = [distrito, provincia, departamento].filter(Boolean).join(' - ');
+
+      contentHtml = `
+        <div class="title-banner">
+          <h2>REPORTE OSINT: CONSULTA DNI BÁSICO</h2>
+          <p style="margin: 4px 0 0 0; font-size: 12px; color: #4a5568;">Ciudadano: <strong>${finalFull}</strong></p>
+        </div>
+        <div class="section-title">Datos Personales y Ubicación</div>
+        <div class="grid">
+          <div class="row"><span class="label">Nombres:</span><span class="value">${nombres || finalFull}</span></div>
+          <div class="row"><span class="label">Apellido Paterno:</span><span class="value">${apPaterno || '-'}</span></div>
+          <div class="row"><span class="label">Apellido Materno:</span><span class="value">${apMaterno || '-'}</span></div>
+          <div class="row"><span class="label">DNI / Documento:</span><span class="value">${numDni}</span></div>
+          <div class="row"><span class="label">Fecha Nacimiento:</span><span class="value">${nacimiento}</span></div>
+          <div class="row"><span class="label">Género / Nacionalidad:</span><span class="value">${gen} / ${nac}</span></div>
+          <div class="row full-width"><span class="label">Dirección Domicilio:</span><span class="value">${direccion || 'NO REGISTRADO'}</span></div>
+          <div class="row full-width"><span class="label">Ubigeo Domicilio:</span><span class="value">${ubigeoDomicilio || 'NO REGISTRADO'}</span></div>
+          <div class="row" style="border-bottom:none;"><span class="label">Email / Teléfono:</span><span class="value">${correo} / ${tel}</span></div>
+        </div>
+      `;
+    } else if (osintModule === 'dni_premium' || osintModule === 'dnit') {
+      const imagesHtml = (osintResult.images || []).map((img, i) => `
+        <div class="image-box">
+          <img src="${img.data_uri}" style="width:${i === 0 ? '100px' : '90px'}; height:${i === 0 ? '120px' : '50px'}; object-fit:contain;" />
+          <div style="font-size:8px; font-weight:bold; margin-top:4px; color:#4a5568; text-align:center;">${['FOTO REGISTRAL','FIRMA DIGITAL','HUELLA BIOMÉTRICA 1','HUELLA BIOMÉTRICA 2'][i]}</div>
+        </div>
+      `).join('');
+
+      contentHtml = `
+        <div class="title-banner">
+          <h2>REPORTE OSINT: DNI PREMIUM BIOMÉTRICO</h2>
+          <p style="margin: 4px 0 0 0; font-size: 12px; color: #4a5568;">Ciudadano: <strong>${osintResult.apellidos} ${osintResult.nombres}</strong></p>
+        </div>
+        
+        <div class="section-title">Archivos Biométricos RENIEC</div>
+        <div class="images-container">
+          ${imagesHtml || '<p style="font-size:11px; color:#e53e3e;">No se registraron imágenes biométricas.</p>'}
+        </div>
+        
+        <div class="section-title">Ficha Completa de Identidad</div>
+        <div class="grid">
+          <div class="row"><span class="label">Nombres Completos:</span><span class="value">${osintResult.nombres}</span></div>
+          <div class="row"><span class="label">Apellidos Completos:</span><span class="value">${osintResult.apellidos}</span></div>
+          <div class="row"><span class="label">DNI Completo (DV):</span><span class="value"><strong>${osintResult.dni?.completo || osintResult.dni?.numero || ''}</strong></span></div>
+          <div class="row"><span class="label">Género / Edad:</span><span class="value">${osintResult.genero} / ${osintResult.nacimiento?.edad}</span></div>
+          <div class="row"><span class="label">Fecha Nacimiento:</span><span class="value">${osintResult.nacimiento?.fecha}</span></div>
+          <div class="row"><span class="label">Ubigeo Nacimiento:</span><span class="value">${osintResult.nacimiento?.distrito} - ${osintResult.nacimiento?.provincia} - ${osintResult.nacimiento?.departamento}</span></div>
+          <div class="row"><span class="label">Estado Civil / Educación:</span><span class="value">${osintResult.informacion_general?.estado_civil} / ${osintResult.informacion_general?.nivel_educativo}</span></div>
+          <div class="row"><span class="label">Estatura / Donante:</span><span class="value">${osintResult.informacion_general?.estatura || '1.75 MT.'} / ${osintResult.informacion_general?.donante_organos || 'NO'}</span></div>
+          <div class="row"><span class="label">Inscripción / Emisión:</span><span class="value">${osintResult.informacion_general?.fecha_inscripcion || '-'} / ${osintResult.informacion_general?.fecha_emision || '-'}</span></div>
+          <div class="row"><span class="label">Fecha Caducidad DNI:</span><span class="value" style="color:#e53e3e; font-weight:bold;">${osintResult.informacion_general?.fecha_caducidad}</span></div>
+          <div class="row"><span class="label">Restricciones:</span><span class="value">${osintResult.informacion_general?.restriccion || 'NINGUNA'}</span></div>
+          <div class="row"><span class="label">Nombres Padre / Madre:</span><span class="value">${osintResult.informacion_general?.padre} / ${osintResult.informacion_general?.madre}</span></div>
+          <div class="row full-width"><span class="label">Dirección Domicilio:</span><span class="value">${osintResult.domicilio?.direccion || 'NO REGISTRADA'} (${osintResult.domicilio?.distrito || ''} - ${osintResult.domicilio?.provincia || ''} - ${osintResult.domicilio?.departamento || ''})</span></div>
+          <div class="row full-width" style="border-bottom:none;"><span class="label">Códigos Ubigeo:</span><span class="value">RENIEC: ${osintResult.ubigeos?.reniec || '-'} | INEI: ${osintResult.ubigeos?.ine || '-'} | SUNAT: ${osintResult.ubigeos?.sunat || '-'}</span></div>
+        </div>
+      `;
+    } else if (osintModule === 'nm') {
+      const resRows = (osintResult.resultados || []).map((r, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td><strong>${r.dni}</strong></td>
+          <td>${r.nombres}</td>
+          <td>${r.apellidos}</td>
+          <td>${r.edad} años</td>
+        </tr>
+      `).join('');
+      contentHtml = `
+        <div class="title-banner">
+          <h2>REPORTE OSINT: BÚSQUEDA POR NOMBRES (NM)</h2>
+          <p style="margin: 4px 0 0 0; font-size: 12px; color: #4a5568;">Cantidad de Coincidencias: <strong>${osintResult.cantidad_resultados || 0} registros</strong></p>
+        </div>
+        <div class="section-title">Resultados de Coincidencias Encontradas</div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th style="width:40px;">N°</th>
+              <th>DNI</th>
+              <th>Nombres</th>
+              <th>Apellidos</th>
+              <th>Edad</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${resRows || '<tr><td colspan="5" style="text-align:center;">Ningún registro encontrado.</td></tr>'}
+          </tbody>
+        </table>
+      `;
+    } else if (osintModule === 'ag') {
+      const famRows = (osintResult.relaciones || []).map((r, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td><strong>${r.dni}</strong></td>
+          <td>${r.relacion}</td>
+          <td>${r.nombres}</td>
+          <td>${r.apellidos}</td>
+          <td>${r.edad} años</td>
+          <td>${r.sexo}</td>
+          <td style="font-weight:bold; color:${r.verificacion === 'ALTO' ? '#00aa55' : '#ffaa00'};">${r.verificacion}</td>
+        </tr>
+      `).join('');
+      contentHtml = `
+        <div class="title-banner">
+          <h2>REPORTE OSINT: ÁRBOL GENEALÓGICO (AG)</h2>
+          <p style="margin: 4px 0 0 0; font-size: 12px; color: #4a5568;">Familiaridad Encontrada: <strong>${osintResult.familiares || 0} parientes</strong></p>
+        </div>
+        <div class="section-title">Conexiones Familiares Identificadas</div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th style="width:30px;">N°</th>
+              <th>DNI</th>
+              <th>Relación</th>
+              <th>Nombres</th>
+              <th>Apellidos</th>
+              <th>Edad</th>
+              <th>Género</th>
+              <th>Verificación</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${famRows || '<tr><td colspan="8" style="text-align:center;">Ningún familiar registrado.</td></tr>'}
+          </tbody>
+        </table>
+      `;
+    } else if (osintModule === 'telp') {
+      const telRows = (osintResult.lineas || []).map((l, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td><strong>${l.telefono}</strong></td>
+          <td>${l.operador}</td>
+          <td>${l.empresa}</td>
+          <td>${l.periodo}</td>
+        </tr>
+      `).join('');
+      contentHtml = `
+        <div class="title-banner">
+          <h2>REPORTE OSINT: LÍNEAS TELEFÓNICAS (TELP)</h2>
+          <p style="margin: 4px 0 0 0; font-size: 12px; color: #4a5568;">Cantidad de Líneas Activas: <strong>${osintResult.lineas_encontradas || 0} números</strong></p>
+        </div>
+        <div class="section-title">Líneas Registradas en Osiptel</div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th style="width:40px;">N°</th>
+              <th>Número Telefónico</th>
+              <th>Operador</th>
+              <th>Razón Social / Empresa</th>
+              <th>Periodo Activo</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${telRows || '<tr><td colspan="5" style="text-align:center;">Ninguna línea telefónica registrada.</td></tr>'}
+          </tbody>
+        </table>
+      `;
+    } else if (osintModule === 'telp_cel') {
+      const titRows = (osintResult.titulares || []).map((t, i) => `
+        <tr>
+          <td>${i + 1}</td>
+          <td><strong>${t.titular}</strong></td>
+          <td>${t.dni_ruc}</td>
+          <td>${t.operador}</td>
+          <td>${t.plan || '-'}</td>
+          <td>${t.periodo}</td>
+          <td>${t.n_ip || '-'}</td>
+        </tr>
+      `).join('');
+      contentHtml = `
+        <div class="title-banner">
+          <h2>REPORTE OSINT: BÚSQUEDA INVERSA CELULAR (TELP CEL)</h2>
+          <p style="margin: 4px 0 0 0; font-size: 12px; color: #4a5568;">Celular Consultado: <strong>${queryInput}</strong></p>
+        </div>
+        <div class="section-title">Titular de la Línea y Detalles de Contratación</div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th style="width:30px;">N°</th>
+              <th>Titular Completo</th>
+              <th>DNI / RUC</th>
+              <th>Operador</th>
+              <th>Plan</th>
+              <th>Periodo</th>
+              <th>N_IP</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${titRows || '<tr><td colspan="7" style="text-align:center;">Ningún titular registrado.</td></tr>'}
+          </tbody>
+        </table>
+      `;
+    } else if (osintModule === 'pla') {
+      const propietario = osintResult.propietario || osintResult.owner || '';
+      const marca = osintResult.marca || osintResult.brand || '';
+      const modelo = osintResult.modelo || osintResult.model || '';
+      const color = osintResult.color || '';
+      const nroSerie = osintResult.nro_serie || osintResult.numero_serie || '';
+      const nroMotor = osintResult.nro_motor || osintResult.numero_motor || '';
+      const estado = osintResult.estado || '';
+      
+      contentHtml = `
+        <div class="title-banner">
+          <h2>REPORTE OSINT: CONSULTA VEHICULAR SUNARP</h2>
+          <p style="margin: 4px 0 0 0; font-size: 12px; color: #4a5568;">Placa: <strong>${osintResult.placa || queryInput}</strong></p>
+        </div>
+        <div class="section-title">Fotografía Oficial de la Placa</div>
+        <div style="display:flex; justify-content:center; margin-bottom:20px;">
+          <div class="image-box" style="width:250px; border:2px solid #cbd5e0; border-radius:6px; background:#fff; padding:5px;">
+            <img src="${osintResult.images?.[0]?.data_uri}" style="width:100%; height:auto;" />
+          </div>
+        </div>
+        ${(propietario || marca || modelo || color || nroSerie || nroMotor || estado) ? `
+          <div class="section-title">Detalles del Vehículo Registrados en SUNARP</div>
+          <div class="grid">
+            <div class="row full-width"><span class="label">Propietario Completo:</span><span class="value">${propietario}</span></div>
+            <div class="row"><span class="label">Marca:</span><span class="value">${marca}</span></div>
+            <div class="row"><span class="label">Modelo:</span><span class="value">${modelo}</span></div>
+            <div class="row"><span class="label">Color:</span><span class="value">${color}</span></div>
+            <div class="row"><span class="label">Número de Serie:</span><span class="value">${nroSerie}</span></div>
+            <div class="row"><span class="label">Número de Motor:</span><span class="value">${nroMotor}</span></div>
+            <div class="row" style="border-bottom:none;"><span class="label">Estado Registral:</span><span class="value">${estado}</span></div>
+          </div>
+        ` : ''}
+      `;
+    }
+
+    printWindow.document.write(`
+      <html>
+      <head>
+        <title>Reporte OSINT - ${queryInput}</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            color: #1a202c;
+            margin: 0;
+            padding: 30px;
+            background: #fff;
+          }
+          .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #00f2fe;
+            padding-bottom: 15px;
+            margin-bottom: 25px;
+          }
+          .header h1 {
+            margin: 0;
+            font-size: 20px;
+            color: #0d1117;
+            letter-spacing: 1px;
+          }
+          .header .tech {
+            font-size: 11px;
+            color: #4a5568;
+            text-align: right;
+          }
+          .title-banner {
+            background: #f7fafc;
+            border: 1px solid #e2e8f0;
+            border-left: 5px solid #00f2fe;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+          }
+          .title-banner h2 {
+            margin: 0;
+            font-size: 18px;
+            color: #0d1117;
+          }
+          .section-title {
+            font-size: 12px;
+            text-transform: uppercase;
+            color: #4a5568;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 5px;
+            margin-top: 25px;
+            margin-bottom: 15px;
+            font-weight: bold;
+            letter-spacing: 0.5px;
+          }
+          .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+          }
+          .row {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px dashed #e2e8f0;
+            padding: 6px 0;
+            font-size: 12px;
+          }
+          .row.full-width {
+            grid-column: span 2;
+          }
+          .label {
+            font-weight: bold;
+            color: #4a5568;
+          }
+          .value {
+            color: #0d1117;
+            text-align: right;
+          }
+          .images-container {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+            align-items: center;
+          }
+          .image-box {
+            border: 1px solid #cbd5e0;
+            padding: 5px;
+            border-radius: 4px;
+            background: #f7fafc;
+          }
+          .image-box img {
+            display: block;
+          }
+          .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 11px;
+          }
+          .table th {
+            background: #edf2f7;
+            border: 1px solid #cbd5e0;
+            padding: 8px;
+            text-align: left;
+            font-weight: bold;
+            color: #4a5568;
+          }
+          .table td {
+            border: 1px solid #cbd5e0;
+            padding: 8px;
+          }
+          .footer {
+            border-top: 1px solid #e2e8f0;
+            margin-top: 50px;
+            padding-top: 15px;
+            text-align: center;
+            font-size: 10px;
+            color: #a0aec0;
+          }
+          @media print {
+            body { padding: 0; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div>
+            <h1>LDTECH99 SECURITY OSINT</h1>
+            <span style="font-size:10px; color:#4a5568; letter-spacing:1px;">GATEWAY SECURE AUDIT REPORT</span>
+          </div>
+          <div class="tech">
+            <strong>Fecha de Generación:</strong> ${dateStr}<br/>
+            <strong>Origen de Datos:</strong> ${osintSource || 'API_GATEWAY_v2'}
+          </div>
+        </div>
+        
+        ${contentHtml}
+        
+        <div class="footer">
+          ESTE REPORTE CONTIENE INFORMACIÓN DE USO CONFIDENCIAL Y AUDITADA.<br/>
+          Generado automáticamente por el Portal de Búsqueda Seguro de LDTech99. Todos los derechos reservados &copy; ${new Date().getFullYear()}.
+        </div>
+        
+        <script>
+          window.onload = function() {
+            setTimeout(function() {
+              window.print();
+            }, 300);
+          };
+        </script>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+  };
+
   // Alias retrocompatibles
   const handleRucSearch = (e, v) => { setOsintModule('ruc'); if(v) setQueryInput(v); handleOsintSearch(e, v); };
   const handleDniSearch = (e, v) => { setOsintModule('dni_premium'); if(v) setQueryInput(v); handleOsintSearch(e, v); };
@@ -758,20 +1200,50 @@ function App() {
                 <span>// {MODULE_CONFIG[osintModule]?.label} DATA STREAM v2.0 //</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                   {osintResult && !osintLoading && (
-                    osintSource === 'LOCAL_CACHE' ? (
-                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                        <span style={{ fontSize: '9px', background: 'rgba(0,170,255,0.15)', border: '1px solid #00aaff', color: '#00aaff', padding: '2px 6px', borderRadius: '4px', fontFamily: 'var(--font-mono)' }}>[ LOCAL CACHE ]</span>
-                        <button type="button" onClick={(e) => handleOsintSearch(e, queryInput, osintModule, true)}
-                          style={{ background: 'rgba(255,0,0,0.1)', border: '1px solid rgba(255,0,0,0.3)', color: '#ff7e7e', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '8px', textTransform: 'uppercase', padding: '2px 6px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px' }}
-                          title="Volver a consultar la API en vivo para sobreescribir la caché">
-                          🔄 Recargar
-                        </button>
-                      </div>
-                    ) : osintSource?.includes('FALLBACK') ? (
-                      <span style={{ fontSize: '9px', background: 'rgba(255,150,0,0.15)', border: '1px solid #ffaa00', color: '#ffaa00', padding: '2px 6px', borderRadius: '4px', fontFamily: 'var(--font-mono)' }}>[ LOCAL FALLBACK ]</span>
-                    ) : (
-                      <span style={{ fontSize: '9px', background: 'rgba(0,255,0,0.15)', border: '1px solid #00ff00', color: '#00ff00', padding: '2px 6px', borderRadius: '4px', fontFamily: 'var(--font-mono)' }}>[ LIVE API DATA ]</span>
-                    )
+                    <>
+                      <button type="button" onClick={handleGeneratePDF}
+                        style={{
+                          background: 'rgba(0, 242, 254, 0.1)',
+                          border: '1px solid rgba(0, 242, 254, 0.3)',
+                          color: '#00f2fe',
+                          cursor: 'pointer',
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: '8px',
+                          textTransform: 'uppercase',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '3px',
+                          marginRight: '6px',
+                          transition: 'all 0.2s ease'
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background = 'rgba(0, 242, 254, 0.2)';
+                          e.currentTarget.style.borderColor = '#00f2fe';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = 'rgba(0, 242, 254, 0.1)';
+                          e.currentTarget.style.borderColor = 'rgba(0, 242, 254, 0.3)';
+                        }}
+                      >
+                        📄 Reporte PDF
+                      </button>
+                      {osintSource === 'LOCAL_CACHE' ? (
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                          <span style={{ fontSize: '9px', background: 'rgba(0,170,255,0.15)', border: '1px solid #00aaff', color: '#00aaff', padding: '2px 6px', borderRadius: '4px', fontFamily: 'var(--font-mono)' }}>[ LOCAL CACHE ]</span>
+                          <button type="button" onClick={(e) => handleOsintSearch(e, queryInput, osintModule, true)}
+                            style={{ background: 'rgba(255,0,0,0.1)', border: '1px solid rgba(255,0,0,0.3)', color: '#ff7e7e', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '8px', textTransform: 'uppercase', padding: '2px 6px', borderRadius: '4px', display: 'flex', alignItems: 'center', gap: '3px' }}
+                            title="Volver a consultar la API en vivo para sobreescribir la caché">
+                            🔄 Recargar
+                          </button>
+                        </div>
+                      ) : osintSource?.includes('FALLBACK') ? (
+                        <span style={{ fontSize: '9px', background: 'rgba(255,150,0,0.15)', border: '1px solid #ffaa00', color: '#ffaa00', padding: '2px 6px', borderRadius: '4px', fontFamily: 'var(--font-mono)' }}>[ LOCAL FALLBACK ]</span>
+                      ) : (
+                        <span style={{ fontSize: '9px', background: 'rgba(0,255,0,0.15)', border: '1px solid #00ff00', color: '#00ff00', padding: '2px 6px', borderRadius: '4px', fontFamily: 'var(--font-mono)' }}>[ LIVE API DATA ]</span>
+                      )}
+                    </>
                   )}
                   <span style={{ fontSize: '10px', color: MODULE_CONFIG[osintModule]?.color }}>STATUS: {osintLoading ? 'FETCHING...' : osintResult ? 'SUCCESS' : 'WAITING'}</span>
                 </div>
