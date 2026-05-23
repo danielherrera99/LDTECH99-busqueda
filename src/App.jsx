@@ -564,6 +564,16 @@ function App() {
                   {showToken ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
               </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '8px', fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'rgba(0,255,0,0.5)', border: '1px solid rgba(0,255,0,0.15)', padding: '6px 8px', borderRadius: '4px', background: 'rgba(0,0,0,0.4)' }}>
+                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                   <span>🏢 RUC & 👤 DNI BÁSICO:</span>
+                   <span style={{ color: '#00f2fe', fontWeight: 'bold' }}>⚡ AUTO-FREE TOKEN Inyectado</span>
+                 </div>
+                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                   <span>🪪 MÓDULOS PREMIUM:</span>
+                   <span style={{ color: '#9b51e0', fontWeight: 'bold' }}>🔒 Tu Token Premium Inyectado</span>
+                 </div>
+               </div>
             </div>
 
             {/* Gateway Mode Toggle */}
