@@ -19,11 +19,19 @@ const getToken = (token) =>
   token || localStorage.getItem('sunat_token') || '';
 
 // ─── Helper: Cabeceras para llamada directa ─────────────────────────────────
-const directHeaders = (token) => ({
-  'Content-Type': 'application/json',
-  'Accept': 'application/json',
-  Authorization: `Bearer ${getToken(token)}`,
-});
+const directHeaders = (token, isFree = false) => {
+  let activeToken = token || localStorage.getItem('sunat_token') || '';
+  if (!activeToken || activeToken === 'mkP2mNY8qlrcUC5Y0W9ycNWbfUDPelP3caquQFmDNyUt7P5QKULQfyaybHtr') {
+    activeToken = isFree
+      ? '5oQzLwbZ9TccLCzFhFbHXTgoGHmOsWYxyCfRyZ4FliZrCTriYl4nALdBThi3'
+      : 'mkP2mNY8qlrcUC5Y0W9ycNWbfUDPelP3caquQFmDNyUt7P5QKULQfyaybHtr';
+  }
+  return {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json',
+    Authorization: `Bearer ${activeToken}`,
+  };
+};
 
 // ─── Helper: Petición al Backend (Laravel Gateway) ─────────────────────────
 const backendPost = async (path, body) => {
@@ -65,7 +73,7 @@ export const sunatService = {
       if (mode === 'backend') {
         data = await backendPost('/consultas/ruc', { ruc });
       } else {
-        const res = await fetch(`${CODART_DIRECT}/sunat/ruc/${ruc}`, { headers: directHeaders(token) });
+        const res = await fetch(`${CODART_DIRECT}/sunat/ruc/${ruc}`, { headers: directHeaders(token, true) });
         if (!res.ok) {
           try {
             const errData = await res.json();
@@ -101,7 +109,7 @@ export const reniecBasicService = {
       if (mode === 'backend') {
         data = await backendPost('/consultas/dni', { dni });
       } else {
-        const res = await fetch(`${CODART_DIRECT}/reniec/dni/${dni}`, { headers: directHeaders(token) });
+        const res = await fetch(`${CODART_DIRECT}/reniec/dni/${dni}`, { headers: directHeaders(token, true) });
         if (!res.ok) {
           try {
             const errData = await res.json();
