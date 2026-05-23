@@ -21,10 +21,14 @@ const getToken = (token) =>
 // ─── Helper: Cabeceras para llamada directa ─────────────────────────────────
 const directHeaders = (token, isFree = false) => {
   let activeToken = token || localStorage.getItem('sunat_token') || '';
-  if (!activeToken || activeToken === 'mkP2mNY8qlrcUC5Y0W9ycNWbfUDPelP3caquQFmDNyUt7P5QKULQfyaybHtr') {
-    activeToken = isFree
-      ? '5oQzLwbZ9TccLCzFhFbHXTgoGHmOsWYxyCfRyZ4FliZrCTriYl4nALdBThi3'
-      : 'mkP2mNY8qlrcUC5Y0W9ycNWbfUDPelP3caquQFmDNyUt7P5QKULQfyaybHtr';
+  if (isFree) {
+    // Si es una petición gratuita (RUC / DNI Básico), inyectamos siempre el token gratuito para proteger el saldo premium
+    activeToken = '5oQzLwbZ9TccLCzFhFbHXTgoGHmOsWYxyCfRyZ4FliZrCTriYl4nALdBThi3';
+  } else {
+    // Para peticiones premium, si no hay token configurado o es el default, usamos el premium por defecto
+    if (!activeToken || activeToken === 'mkP2mNY8qlrcUC5Y0W9ycNWbfUDPelP3caquQFmDNyUt7P5QKULQfyaybHtr') {
+      activeToken = 'mkP2mNY8qlrcUC5Y0W9ycNWbfUDPelP3caquQFmDNyUt7P5QKULQfyaybHtr';
+    }
   }
   return {
     'Content-Type': 'application/json',

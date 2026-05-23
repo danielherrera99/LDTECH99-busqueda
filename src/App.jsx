@@ -741,7 +741,13 @@ function App() {
                         let nombres = osintResult.first_name || osintResult.nombres || '';
                         let apPaterno = osintResult.first_last_name || osintResult.apellidoPaterno || osintResult.apellido_paterno || '';
                         let apMaterno = osintResult.second_last_name || osintResult.apellidoMaterno || osintResult.apellido_materno || '';
-                        const full = osintResult.full_name || osintResult.nombre || osintResult.nombre_completo || '';
+                        let full = osintResult.full_name || osintResult.nombre || osintResult.nombre_completo || '';
+
+                        // Si no hay apellidos estructurados y 'nombres' contiene espacios, probablemente sea el nombre completo.
+                        if (!apPaterno && !apMaterno && nombres && nombres.trim().includes(' ')) {
+                          full = nombres;
+                          nombres = '';
+                        }
 
                         // Dynamic parser to split full name if separate fields are missing
                         if (full && (!nombres || !apPaterno || !apMaterno)) {
