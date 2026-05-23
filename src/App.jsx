@@ -440,7 +440,7 @@ function App() {
       <div className="ambient-glow-2"></div>
 
       {/* Cabecera / Navbar */}
-      <header style={{
+      <header className="app-header" style={{
         position: 'sticky',
         top: 0,
         zIndex: 100,
@@ -452,7 +452,7 @@ function App() {
         justifyContent: 'space-between',
         alignItems: 'center'
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+        <div className="header-logo" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <Terminal style={{ color: 'var(--accent-cyan)' }} size={24} />
           <span style={{
             fontFamily: 'var(--font-mono)',
@@ -465,7 +465,7 @@ function App() {
           }}>LDTECH99</span>
         </div>
 
-        <nav style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
+        <nav className="app-nav" style={{ display: 'flex', alignItems: 'center', gap: '24px' }}>
           <a href="#inicio" style={{ color: 'var(--text-main)', textDecoration: 'none', fontSize: '0.9rem', fontWeight: 500, transition: 'color 0.3s' }}>Inicio</a>
           <a href="#ruc" style={{ color: 'var(--text-main)', textDecoration: 'none', fontSize: '0.9rem', fontWeight: 500, transition: 'color 0.3s' }}>Consola RUC</a>
           <a href="#servicios" style={{ color: 'var(--text-main)', textDecoration: 'none', fontSize: '0.9rem', fontWeight: 500, transition: 'color 0.3s' }}>Servicios</a>
@@ -473,19 +473,19 @@ function App() {
           <a href="#cotizador" style={{ color: 'var(--text-main)', textDecoration: 'none', fontSize: '0.9rem', fontWeight: 500, transition: 'color 0.3s' }}>Cotizador</a>
         </nav>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.03)', padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--border-glass)' }}>
+        <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+          <div className="profile-badge" style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.03)', padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--border-glass)' }}>
             <img src={currentUser?.avatar} alt={currentUser?.username} style={{ width: '24px', height: '24px', borderRadius: '50%' }} />
             <span style={{ fontSize: '0.8rem', color: 'var(--text-bright)', fontFamily: 'var(--font-mono)' }}>{currentUser?.username}</span>
           </div>
-          <button onClick={handleLogout} className="btn" style={{ padding: '8px 16px', background: 'rgba(255,0,0,0.1)', color: '#ff7e7e', border: '1px solid rgba(255,0,0,0.2)', borderRadius: '8px', display: 'flex', gap: '6px', alignItems: 'center' }}>
+          <button onClick={handleLogout} className="btn logout-btn" style={{ padding: '8px 16px', background: 'rgba(255,0,0,0.1)', color: '#ff7e7e', border: '1px solid rgba(255,0,0,0.2)', borderRadius: '8px', display: 'flex', gap: '6px', alignItems: 'center' }}>
             <LogOut size={16} /> Salir
           </button>
         </div>
       </header>
 
       {/* Hero Section */}
-      <section id="inicio" style={{
+      <section id="inicio" className="hero-section" style={{
         padding: '100px 5% 60px',
         display: 'flex',
         flexDirection: 'column',
@@ -497,7 +497,7 @@ function App() {
           <Sparkles size={14} /> LISTO PARA EL DESARROLLO DE TU NUEVA API
         </div>
 
-        <h1 style={{
+        <h1 className="hero-title" style={{
           fontSize: 'clamp(2.5rem, 6vw, 4.5rem)',
           lineHeight: 1.1,
           maxWidth: '1000px',
@@ -510,7 +510,7 @@ function App() {
           Transformamos Ideas en Software Premium & Experiencias Digitales
         </h1>
 
-        <p style={{
+        <p className="hero-subtitle" style={{
           fontSize: '1.2rem',
           color: 'var(--text-muted)',
           maxWidth: '650px',
@@ -520,7 +520,7 @@ function App() {
           Diseño web a medida, arquitectura en la nube de alta disponibilidad y soluciones de software escalables. Desarrollado por Luis Daniel Herrera.
         </p>
 
-        <div style={{ display: 'flex', gap: '16px' }}>
+        <div className="hero-ctas" style={{ display: 'flex', gap: '16px' }}>
           <a href="#cotizador" className="btn btn-primary">
             <Calculator size={18} /> Cotizar Mi Proyecto
           </a>
@@ -531,11 +531,11 @@ function App() {
       </section>
 
       {/* Consulta OSINT Section - 9 Módulos */}
-      <section id="ruc" style={{ padding: '80px 5%', position: 'relative' }}>
+      <section id="ruc" className="osint-section" style={{ padding: '80px 5%', position: 'relative' }}>
         <h2 className="section-title">Consola OSINT Premium</h2>
         <p className="section-subtitle">Gateway de Validación de Identidad en Tiempo Real · 9 Módulos Codart API · Arquitectura Laravel Segura</p>
 
-        <div className="glass-card" style={{
+        <div className="glass-card osint-grid" style={{
           display: 'grid',
           gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
           padding: '40px',
@@ -613,8 +613,8 @@ function App() {
                   ))}
                 </>
               ) : (
-                <div style={{ position: 'relative' }}>
-                  <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: `${MODULE_CONFIG[osintModule]?.color}99`, whiteSpace: 'nowrap' }}>
+                <div className="osint-input-wrapper" style={{ position: 'relative' }}>
+                  <span className="osint-input-label" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: `${MODULE_CONFIG[osintModule]?.color}99`, whiteSpace: 'nowrap' }}>
                     {osintModule}_query:
                   </span>
                   <input type="text" value={queryInput}
@@ -622,7 +622,7 @@ function App() {
                     placeholder={MODULE_CONFIG[osintModule]?.placeholder}
                     maxLength={MODULE_CONFIG[osintModule]?.maxLen}
                     disabled={osintLoading}
-                    className="ruc-input-glowing"
+                    className="ruc-input-glowing osint-input-field"
                     style={{ background: 'rgba(0,0,0,0.9)', border: `1px solid ${MODULE_CONFIG[osintModule]?.color}`, borderRadius: '6px', padding: '11px 11px 11px 110px', width: '100%', boxSizing: 'border-box', color: MODULE_CONFIG[osintModule]?.color, fontFamily: 'Courier New, monospace', fontSize: '14px', outline: 'none' }} />
                 </div>
               )}
