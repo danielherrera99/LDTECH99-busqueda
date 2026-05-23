@@ -705,38 +705,46 @@ function App() {
                   ) : (
                     <>
                        {osintModule === 'ruc' && (() => {
-                        const razonSocial = osintResult.razon_social || osintResult.razonSocial || osintResult.nombre || '';
-                        const rucNum = osintResult.numero_documento || osintResult.numeroDocumento || osintResult.ruc || '';
-                        const estado = osintResult.estado || '';
-                        const condicion = osintResult.condicion || '';
-                        const direccion = osintResult.direccion || osintResult.direccionFiscal || '';
-                        const distrito = osintResult.distrito || '';
-                        const depto = osintResult.departamento || '';
-                        const actividad = osintResult.actividad_economica || osintResult.actividadEconomica || '';
-                        const tipo = osintResult.tipo || osintResult.tipoContribuyente || '';
-                        const trabajadores = osintResult.numero_trabajadores || osintResult.numeroTrabajadores || '0';
-                        const esBuenContribuyente = osintResult.es_buen_contribuyente !== undefined ? osintResult.es_buen_contribuyente : osintResult.esBuenContribuyente;
-                        const facturacion = osintResult.tipo_facturacion || osintResult.tipoFacturacion || '';
-                        const contabilidad = osintResult.tipo_contabilidad || osintResult.tipoContabilidad || '';
-                        return (
-                          <div>
-                            <div style={{ marginBottom: '16px', borderBottom: '1px dashed rgba(0,255,0,0.2)', paddingBottom: '12px' }}>
-                              <span style={{ fontSize: '11px', color: 'rgba(0,255,0,0.6)', display: 'block' }}>RAZÓN SOCIAL</span>
-                              <h4 style={{ fontSize: '1.4rem', color: '#fff', fontWeight: 'bold', margin: '4px 0 8px 0' }}>{razonSocial}</h4>
-                              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                <span className="terminal-glow-chip">RUC: {rucNum}</span>
-                                <span className={`terminal-glow-chip ${estado !== 'ACTIVO' ? 'danger' : ''}`}>{estado}</span>
-                                <span className="terminal-glow-chip">{condicion}</span>
-                              </div>
-                            </div>
-                            <div className="terminal-row"><span className="terminal-label">Dirección Fiscal:</span><span className="terminal-value">{direccion}{distrito ? `, ${distrito}` : ''}{depto ? ` - ${depto}` : ''}</span></div>
-                            <div className="terminal-row"><span className="terminal-label">Actividad Económica:</span><span className="terminal-value">{actividad}</span></div>
-                            <div className="terminal-row"><span className="terminal-label">Tipo / Trabajadores:</span><span className="terminal-value">{tipo} // {trabajadores} trab.</span></div>
-                            <div className="terminal-row"><span className="terminal-label">Buen Contribuyente:</span><span className="terminal-value" style={{ color: esBuenContribuyente ? '#00ff88' : '#ff7e7e' }}>{esBuenContribuyente ? '✔ SÍ' : '✘ NO'}</span></div>
-                            <div className="terminal-row" style={{ borderBottom: 'none' }}><span className="terminal-label">Facturación / Contab.:</span><span className="terminal-value">{facturacion} // {contabilidad}</span></div>
-                          </div>
-                        );
-                      })()}
+                         const razonSocial = osintResult.razon_social || osintResult.razonSocial || osintResult.nombre || '';
+                         const rucNum = osintResult.numero_documento || osintResult.numeroDocumento || osintResult.ruc || '';
+                         const estado = osintResult.estado || '';
+                         const condicion = osintResult.condicion || '';
+                         const direccion = osintResult.direccion || osintResult.direccionFiscal || '';
+                         const distrito = osintResult.distrito || '';
+                         const depto = osintResult.departamento || '';
+                         const actividad = osintResult.actividad_economica || osintResult.actividadEconomica || '';
+                         const tipo = osintResult.tipo || osintResult.tipoContribuyente || '';
+                         const trabajadores = osintResult.numero_trabajadores || osintResult.numeroTrabajadores || '0';
+                         const esBuenContribuyente = osintResult.es_buen_contribuyente !== undefined ? osintResult.es_buen_contribuyente : osintResult.esBuenContribuyente;
+                         const facturacion = osintResult.tipo_facturacion || osintResult.tipoFacturacion || '';
+                         const contabilidad = osintResult.tipo_contabilidad || osintResult.tipoContabilidad || '';
+                         const esAgenteRetencion = osintResult.es_agente_retencion !== undefined ? osintResult.es_agente_retencion : osintResult.esAgenteRetencion;
+                         const localesAnexos = osintResult.locales_anexos || osintResult.localesAnexos || null;
+                         const comercioExterior = osintResult.comercio_exterior || osintResult.comercioExterior || '';
+                         const ubigeo = osintResult.ubigeo || '';
+                         return (
+                           <div>
+                             <div style={{ marginBottom: '16px', borderBottom: '1px dashed rgba(0,255,0,0.2)', paddingBottom: '12px' }}>
+                               <span style={{ fontSize: '11px', color: 'rgba(0,255,0,0.6)', display: 'block' }}>RAZÓN SOCIAL</span>
+                               <h4 style={{ fontSize: '1.4rem', color: '#fff', fontWeight: 'bold', margin: '4px 0 8px 0' }}>{razonSocial}</h4>
+                               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                 <span className="terminal-glow-chip">RUC: {rucNum}</span>
+                                 <span className={`terminal-glow-chip ${estado !== 'ACTIVO' ? 'danger' : ''}`}>{estado}</span>
+                                 <span className="terminal-glow-chip">{condicion}</span>
+                               </div>
+                             </div>
+                             <div className="terminal-row"><span className="terminal-label">Dirección Fiscal:</span><span className="terminal-value">{direccion}{distrito ? `, ${distrito}` : ''}{depto ? ` - ${depto}` : ''}</span></div>
+                             <div className="terminal-row"><span className="terminal-label">Actividad Económica:</span><span className="terminal-value">{actividad}</span></div>
+                             <div className="terminal-row"><span className="terminal-label">Tipo / Trabajadores:</span><span className="terminal-value">{tipo} // {trabajadores} trab.</span></div>
+                             <div className="terminal-row"><span className="terminal-label">Buen Contribuyente:</span><span className="terminal-value" style={{ color: esBuenContribuyente ? '#00ff88' : '#ff7e7e' }}>{esBuenContribuyente ? '✔ SÍ' : '✘ NO'}</span></div>
+                             <div className="terminal-row"><span className="terminal-label">Facturación / Contab.:</span><span className="terminal-value">{facturacion} // {contabilidad}</span></div>
+                             {comercioExterior && <div className="terminal-row"><span className="terminal-label">Comercio Exterior:</span><span className="terminal-value">{comercioExterior}</span></div>}
+                             <div className="terminal-row"><span className="terminal-label">Agente de Retención:</span><span className="terminal-value" style={{ color: esAgenteRetencion ? '#00ff88' : '#ff7e7e' }}>{esAgenteRetencion ? '✔ SÍ' : '✘ NO'}</span></div>
+                             <div className="terminal-row"><span className="terminal-label">Locales Anexos:</span><span className="terminal-value">{!localesAnexos || localesAnexos === 'null' || localesAnexos === 'Ninguno' ? 'NINGUNO' : localesAnexos}</span></div>
+                             <div className="terminal-row" style={{ borderBottom: 'none' }}><span className="terminal-label">Ubigeo SUNAT:</span><span className="terminal-value">{ubigeo || 'NO REGISTRADO'}</span></div>
+                           </div>
+                         );
+                       })()}
                       {osintModule === 'dni_basic' && (() => {
                         let nombres = osintResult.first_name || osintResult.nombres || '';
                         let apPaterno = osintResult.first_last_name || osintResult.apellidoPaterno || osintResult.apellido_paterno || '';
@@ -819,6 +827,11 @@ function App() {
                         const nacimiento = osintResult.birth_date || osintResult.fecha_nacimiento || osintResult.fechaNacimiento || '';
                         const tel = osintResult.phone || osintResult.telefono || osintResult.celular || '956041289';
                         const correo = osintResult.email || osintResult.correo || 'demo@ldtech99.com';
+                        const direccion = osintResult.address || osintResult.direccion || '';
+                        const distrito = osintResult.district || osintResult.distrito || '';
+                        const provincia = osintResult.province || osintResult.provincia || '';
+                        const departamento = osintResult.department || osintResult.departamento || '';
+                        const ubigeoDomicilio = [distrito, provincia, departamento].filter(Boolean).join(' - ');
                         return (
                           <div>
                             <h4 style={{ fontSize: '1.5rem', color: '#00f2fe', margin: '0 0 4px 0' }}>{finalFull}</h4>
@@ -831,6 +844,8 @@ function App() {
                             <div className="terminal-row"><span className="terminal-label">Apellido Paterno:</span><span className="terminal-value">{apPaterno}</span></div>
                             <div className="terminal-row"><span className="terminal-label">Apellido Materno:</span><span className="terminal-value">{apMaterno}</span></div>
                             <div className="terminal-row"><span className="terminal-label">Fecha Nacimiento:</span><span className="terminal-value">{nacimiento}</span></div>
+                            <div className="terminal-row"><span className="terminal-label">Dirección:</span><span className="terminal-value">{direccion || 'NO REGISTRADO'}</span></div>
+                            <div className="terminal-row"><span className="terminal-label">Ubigeo Domicilio:</span><span className="terminal-value">{ubigeoDomicilio || 'NO REGISTRADO'}</span></div>
                             <div className="terminal-row" style={{ borderBottom: 'none' }}><span className="terminal-label">Email / Teléfono:</span><span className="terminal-value">{correo} / {tel}</span></div>
                           </div>
                         );
@@ -865,6 +880,25 @@ function App() {
                             <div>
                               <div className="terminal-row" style={{ paddingTop: 0 }}><span className="terminal-label">Padre / Madre:</span><span className="terminal-value">{osintResult.informacion_general?.padre}<br/>{osintResult.informacion_general?.madre}</span></div>
                               <div className="terminal-row" style={{ borderBottom: 'none' }}><span className="terminal-label">Caducidad DNI:</span><span className="terminal-value" style={{ color: '#ff7e7e' }}>{osintResult.informacion_general?.fecha_caducidad}</span></div>
+                            </div>
+                          </div>
+
+                          {/* Dirección y Domicilio */}
+                          {osintResult.domicilio?.direccion && (
+                            <div style={{ borderTop: '1px dashed rgba(155,81,224,0.2)', paddingTop: '10px' }}>
+                              <div className="terminal-row" style={{ paddingTop: 0, borderBottom: 'none' }}><span className="terminal-label">Domicilio:</span><span className="terminal-value">{osintResult.domicilio?.direccion} ({osintResult.domicilio?.distrito} - {osintResult.domicilio?.provincia} - {osintResult.domicilio?.departamento})</span></div>
+                            </div>
+                          )}
+
+                          {/* Fichas técnicas adicionales */}
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', borderTop: '1px dashed rgba(155,81,224,0.2)', paddingTop: '10px' }}>
+                            <div>
+                              <div className="terminal-row" style={{ paddingTop: 0 }}><span className="terminal-label">Estatura / Donante:</span><span className="terminal-value">{osintResult.informacion_general?.estatura || '1.75 MT.'} / {osintResult.informacion_general?.donante_organos || 'NO'}</span></div>
+                              <div className="terminal-row" style={{ borderBottom: 'none' }}><span className="terminal-label">Inscripción / Emisión:</span><span className="terminal-value">{osintResult.informacion_general?.fecha_inscripcion || '-'} // {osintResult.informacion_general?.fecha_emision || '-'}</span></div>
+                            </div>
+                            <div>
+                              <div className="terminal-row" style={{ paddingTop: 0 }}><span className="terminal-label">Restricciones:</span><span className="terminal-value" style={{ color: osintResult.informacion_general?.restriccion !== 'NINGUNA' && osintResult.informacion_general?.restriccion ? '#ffaa00' : '#00ff88' }}>{osintResult.informacion_general?.restriccion || 'NINGUNA'}</span></div>
+                              <div className="terminal-row" style={{ borderBottom: 'none' }}><span className="terminal-label">Códigos Ubigeo:</span><span className="terminal-value" style={{ fontSize: '10px' }}>RNC: {osintResult.ubigeos?.reniec || '-'} | INE: {osintResult.ubigeos?.ine || '-'} | SNT: {osintResult.ubigeos?.sunat || '-'}</span></div>
                             </div>
                           </div>
                         </div>
@@ -941,24 +975,46 @@ function App() {
                                 <div className="terminal-row" style={{ paddingTop: 0 }}><span className="terminal-label">DNI/RUC:</span><span className="terminal-value">{t.dni_ruc}</span></div>
                                 <div className="terminal-row"><span className="terminal-label">Operador:</span><span className="terminal-value">{t.operador}</span></div>
                                 <div className="terminal-row"><span className="terminal-label">Plan:</span><span className="terminal-value">{t.plan}</span></div>
-                                <div className="terminal-row" style={{ borderBottom: 'none' }}><span className="terminal-label">Correo:</span><span className="terminal-value">{t.correo}</span></div>
-                                <div className="terminal-row" style={{ borderBottom: 'none' }}><span className="terminal-label">Empresa:</span><span className="terminal-value" style={{ fontSize: '10px' }}>{t.empresa}</span></div>
+                                <div className="terminal-row"><span className="terminal-label">Correo:</span><span className="terminal-value">{t.correo || 'NO REGISTRADO'}</span></div>
+                                <div className="terminal-row"><span className="terminal-label">Periodo:</span><span className="terminal-value">{t.periodo || 'NO REGISTRADO'}</span></div>
+                                <div className="terminal-row" style={{ borderBottom: 'none' }}><span className="terminal-label">Empresa:</span><span className="terminal-value" style={{ fontSize: '10px' }}>{t.empresa || 'NO REGISTRADO'}</span></div>
+                                <div className="terminal-row" style={{ borderBottom: 'none' }}><span className="terminal-label">N_IP:</span><span className="terminal-value">{t.n_ip || 'NO REGISTRADO'}</span></div>
                               </div>
                             </div>
                           ))}
                         </div>
                       )}
-                      {osintModule === 'pla' && (
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', padding: '10px 0' }}>
-                          <div style={{ fontSize: '10px', color: '#ffdd00', fontFamily: 'var(--font-mono)', border: '1px solid rgba(255,221,0,0.2)', padding: '4px 12px', borderRadius: '4px', background: 'rgba(255,221,0,0.04)' }}>
-                            PLACA: {osintResult.placa} · SUNARP PERÚ
+                      {osintModule === 'pla' && (() => {
+                        const propietario = osintResult.propietario || osintResult.owner || '';
+                        const marca = osintResult.marca || osintResult.brand || '';
+                        const modelo = osintResult.modelo || osintResult.model || '';
+                        const color = osintResult.color || '';
+                        const nroSerie = osintResult.nro_serie || osintResult.numero_serie || osintResult.serie || '';
+                        const nroMotor = osintResult.nro_motor || osintResult.numero_motor || osintResult.motor || '';
+                        const estado = osintResult.estado || '';
+                        return (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
+                              <div style={{ fontSize: '10px', color: '#ffdd00', fontFamily: 'var(--font-mono)', border: '1px solid rgba(255,221,0,0.2)', padding: '4px 12px', borderRadius: '4px', background: 'rgba(255,221,0,0.04)' }}>
+                                PLACA: {osintResult.placa} · SUNARP PERÚ
+                              </div>
+                              <div style={{ width: '100%', maxWidth: '280px', borderRadius: '8px', overflow: 'hidden', border: '2px solid rgba(255,221,0,0.4)', boxShadow: '0 0 20px rgba(255,221,0,0.1)' }}>
+                                <img src={osintResult.images?.[0]?.data_uri} alt={`Placa ${osintResult.placa}`} style={{ width: '100%', height: 'auto', display: 'block' }} />
+                              </div>
+                            </div>
+                            
+                            {(propietario || marca || modelo || color || nroSerie || nroMotor || estado) && (
+                              <div style={{ borderTop: '1px dashed rgba(255,221,0,0.3)', paddingTop: '12px' }}>
+                                {propietario && <div className="terminal-row"><span className="terminal-label" style={{ color: '#ffdd00' }}>Propietario:</span><span className="terminal-value">{propietario}</span></div>}
+                                {(marca || modelo) && <div className="terminal-row"><span className="terminal-label" style={{ color: '#ffdd00' }}>Marca / Modelo:</span><span className="terminal-value">{[marca, modelo].filter(Boolean).join(' // ')}</span></div>}
+                                {color && <div className="terminal-row"><span className="terminal-label" style={{ color: '#ffdd00' }}>Color:</span><span className="terminal-value">{color}</span></div>}
+                                {(nroSerie || nroMotor) && <div className="terminal-row"><span className="terminal-label" style={{ color: '#ffdd00' }}>Serie / Motor:</span><span className="terminal-value">{[nroSerie, nroMotor].filter(Boolean).join(' // ')}</span></div>}
+                                {estado && <div className="terminal-row" style={{ borderBottom: 'none' }}><span className="terminal-label" style={{ color: '#ffdd00' }}>Estado Registral:</span><span className="terminal-value">{estado}</span></div>}
+                              </div>
+                            )}
                           </div>
-                          <div style={{ width: '100%', maxWidth: '320px', borderRadius: '10px', overflow: 'hidden', border: '2px solid rgba(255,221,0,0.4)', boxShadow: '0 0 20px rgba(255,221,0,0.1)' }}>
-                            <img src={osintResult.images?.[0]?.data_uri} alt={`Placa ${osintResult.placa}`} style={{ width: '100%', height: 'auto', display: 'block' }} />
-                          </div>
-                          <p style={{ fontSize: '11px', color: 'rgba(255,221,0,0.5)', fontFamily: 'monospace', textAlign: 'center' }}>Foto registral obtenida de la base de datos SUNARP</p>
-                        </div>
-                      )}
+                        );
+                      })()}
                     </>
                   )}
                 </>
