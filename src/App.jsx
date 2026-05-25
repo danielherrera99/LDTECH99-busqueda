@@ -844,11 +844,11 @@ function App() {
     setSuccess('');
     
     if (!username.trim()) {
-      setError('Por favor, ingresa tu usuario (admin).');
+      setError('Por favor, ingresa tu usuario (nnldtech).');
       return;
     }
     if (!password) {
-      setError('Por favor, ingresa tu contraseña (admin123).');
+      setError('Por favor, ingresa tu contraseña (19992015).');
       return;
     }
 
@@ -973,7 +973,7 @@ function App() {
               <input 
                 type="text" 
                 className="input-field" 
-                placeholder="Usuario (admin)"
+                placeholder="Usuario (nnldtech)"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 disabled={loading}
@@ -986,7 +986,7 @@ function App() {
               <input 
                 type={showPassword ? "text" : "password"} 
                 className="input-field password-input" 
-                placeholder="Contraseña (admin123)"
+                placeholder="Contraseña (19992015)"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
@@ -1016,7 +1016,7 @@ function App() {
               </label>
               <a href="#" onClick={(e) => {
                 e.preventDefault();
-                alert('Pista: El usuario por defecto de desarrollo es "admin" y la contraseña es "admin123".');
+                alert('Pista: El usuario por defecto de desarrollo es "nnldtech" y la contraseña es "19992015".');
               }}>¿Olvidaste Contraseña?</a>
             </div>
 
