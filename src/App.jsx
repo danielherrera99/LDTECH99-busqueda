@@ -38,7 +38,10 @@ import {
   agService,
   telpService,
   telpCelService,
-  plaService
+  plaService,
+  denService,
+  denPdfService,
+  rqhService
 } from './services/api';
 import './App.css';
 
@@ -164,6 +167,9 @@ function App() {
     telp:       { label: 'CONSULTAR_TELP()',        cost: '15 Cred', color: '#00ff88', icon: '📱', placeholder: '00000000',    maxLen: 8,  validate: /^\d{8}$/,  hint: '8 dígitos' },
     telp_cel:   { label: 'CONSULTAR_TELP_CEL()',   cost: '15 Cred', color: '#00aaff', icon: '📞', placeholder: '956041289',    maxLen: 9,  validate: /^\d{9}$/,  hint: '9 dígitos (celular)' },
     pla:        { label: 'CONSULTAR_PLA()',         cost: '2 Cred',  color: '#ffdd00', icon: '🚗', placeholder: 'D5G960',        maxLen: 7,  validate: /^[A-Z0-9]{6,7}$/i, hint: '6-7 alfanuméricos' },
+    den:        { label: 'CONSULTAR_DENUNCIAS_PNP()', cost: '15 Cred', color: '#ff0055', icon: '🚨', placeholder: '00000000',    maxLen: 8,  validate: /^\d{8}$/,  hint: '8 dígitos (DNI)' },
+    den_pdf:    { label: 'DESCARGAR_DENUNCIAS_PDF()', cost: '30 Cred', color: '#ff5500', icon: '📄', placeholder: '00000000',    maxLen: 8,  validate: /^\d{8}$/,  hint: '8 dígitos (DNI)' },
+    rqh:        { label: 'CONSULTAR_REQUISITORIAS_RQH()', cost: '30 Cred', color: '#ff00cc', icon: '🔨', placeholder: '00000000',  maxLen: 8,  validate: /^\d{8}$/,  hint: '8 dígitos (DNI)' },
   };
 
   // ─── Manejador OSINT unificado (9 módulos) ──────────────────────────────────
@@ -215,6 +221,9 @@ function App() {
         case 'telp':        response = await telpService.consultarTelp(cleanTarget, apiToken, mode); break;
         case 'telp_cel':    response = await telpCelService.consultarTelpCel(cleanTarget, apiToken, mode); break;
         case 'pla':         response = await plaService.consultarPla(cleanTarget, apiToken, mode); break;
+        case 'den':         response = await denService.consultarDen(cleanTarget, apiToken, mode); break;
+        case 'den_pdf':     response = await denPdfService.consultarDenuncias(cleanTarget, apiToken, mode); break;
+        case 'rqh':         response = await rqhService.consultarRqh(cleanTarget, apiToken, mode); break;
         default: throw new Error('Módulo no reconocido.');
       }
       
@@ -248,6 +257,21 @@ function App() {
       setOsintError(err.message || 'Error en la consulta OSINT.');
     } finally {
       setOsintLoading(false);
+    }
+  };
+
+  const handleDownloadBase64PDF = (base64Data, filename) => {
+    if (!base64Data) return;
+    try {
+      const link = document.createElement('a');
+      link.href = base64Data;
+      link.download = filename || 'documento.pdf';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('[DOWNLOAD ERROR]', err);
+      alert('Error al descargar el PDF. Inténtalo de nuevo.');
     }
   };
 
@@ -534,6 +558,101 @@ function App() {
             <div class="row" style="border-bottom:none;"><span class="label">Estado Registral:</span><span class="value">${estado}</span></div>
           </div>
         ` : ''}
+      `;
+    } else if (osintModule === 'den' || osintModule === 'den_pdf') {
+      const pnpRows = (osintResult.denuncias || []).map((d, i) => `
+        <tr>
+          <td>${d.numero}</td>
+          <td><strong style="color:${d.tipo === 'DENUNCIADO' || d.tipo === 'AGRESOR' ? '#e53e3e' : '#3182ce'}">${d.tipo}</strong></td>
+          <td>${d.comisaria || '-'}</td>
+          <td>${d.n_orden || '-'}</td>
+          <td>${d.f_hecho || '-'}</td>
+          <td>${d.f_registro || '-'}</td>
+        </tr>
+        ${d.resumen ? `
+        <tr>
+          <td colspan="6" style="background:#f7fafc; padding:8px; font-size:10px; font-family:Courier New, monospace; text-align:left;">
+            <strong>[Resumen de Hechos]:</strong> ${d.resumen}
+          </td>
+        </tr>
+        ` : ''}
+      `).join('');
+      contentHtml = `
+        <div class="title-banner">
+          <h2>REPORTE OSINT: ANTECEDENTES Y DENUNCIAS PNP</h2>
+          <p style="margin: 4px 0 0 0; font-size: 12px; color: #4a5568;">Consulta DNI: <strong>${queryInput}</strong></p>
+        </div>
+        <div class="section-title">Registro Oficial de Denuncias Policiales</div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th style="width:30px;">N°</th>
+              <th>Participación</th>
+              <th>Dependencia / Comisaría</th>
+              <th>N° Orden</th>
+              <th>Fecha Hecho</th>
+              <th>Fecha Registro</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${pnpRows || '<tr><td colspan="6" style="text-align:center;">Ninguna denuncia registrada.</td></tr>'}
+          </tbody>
+        </table>
+      `;
+    } else if (osintModule === 'rqh') {
+      const pers = osintResult.datos_personales || {};
+      const res = osintResult.resumen_requisitorias || {};
+      const detailRows = (osintResult.detalle || []).map((rq, i) => `
+        <tr>
+          <td>${rq.numero}</td>
+          <td><span style="font-weight:bold; color:${rq.estado === 'ACTIVA' ? '#e53e3e' : '#718096'}">${rq.estado}</span></td>
+          <td><strong>${rq.tipo}</strong></td>
+          <td>${rq.delito}</td>
+          <td>${rq.exp}</td>
+          <td>${rq.dependencia}</td>
+          <td>${rq.inicio}</td>
+        </tr>
+      `).join('');
+      contentHtml = `
+        <div class="title-banner">
+          <h2>REPORTE OSINT: REQUISITORIAS JUDICIALES (RQH)</h2>
+          <p style="margin: 4px 0 0 0; font-size: 12px; color: #4a5568;">Consulta DNI: <strong>${queryInput}</strong></p>
+        </div>
+        
+        <div class="section-title">Resumen de Órdenes de Captura</div>
+        <div class="grid" style="margin-bottom:20px;">
+          <div class="row"><span class="label">Búsquedas Activas:</span><span class="value" style="font-weight:bold; color:${res.activas > 0 ? '#e53e3e' : '#00aa55'}">${res.activas > 0 ? `⚠️ ACTIVAS: ${res.activas}` : 'NINGUNA'}</span></div>
+          <div class="row"><span class="label">Búsquedas Inactivas:</span><span class="value">${res.inactivas || 0}</span></div>
+          <div class="row" style="border-bottom:none;"><span class="label">Total Registradas:</span><span class="value">${res.total || 0}</span></div>
+        </div>
+
+        <div class="section-title">Datos Personales Judiciales</div>
+        <div class="grid">
+          <div class="row"><span class="label">Nombres Completos:</span><span class="value">${pers.nombres || '-'}</span></div>
+          <div class="row"><span class="label">DNI:</span><span class="value">${pers.dni || '-'}</span></div>
+          <div class="row"><span class="label">Edad / Sexo:</span><span class="value">${pers.edad || '-'} años / ${pers.sexo || '-'}</span></div>
+          <div class="row"><span class="label">Estatura / Ocupación:</span><span class="value">${pers.estatura || '-'} MT / ${pers.ocupacion || '-'}</span></div>
+          <div class="row full-width"><span class="label">Dirección Registrada:</span><span class="value">${pers.direccion || '-'}</span></div>
+          <div class="row full-width" style="border-bottom:none;"><span class="label">Distrito / Ubigeo:</span><span class="value">${pers.distrito || '-'} // ${pers.ubigeo || '-'}</span></div>
+        </div>
+
+        <div class="section-title">Récord Penal Judicial (Órdenes de Captura)</div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th style="width:30px;">N°</th>
+              <th>Estado</th>
+              <th>Medida Judicial</th>
+              <th>Delito Imputado</th>
+              <th>N° Expediente</th>
+              <th>Juzgado Dependencia</th>
+              <th>Fecha Inicio</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${detailRows || '<tr><td colspan="7" style="text-align:center;">Ninguna requisitoria judicial registrada.</td></tr>'}
+          </tbody>
+        </table>
       `;
     }
 
@@ -1562,7 +1681,7 @@ function App() {
                         const nroMotor = osintResult.nro_motor || osintResult.numero_motor || osintResult.motor || '';
                         const estado = osintResult.estado || '';
                         return (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                          <>
                             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '15px' }}>
                               <div style={{ fontSize: '10px', color: '#ffdd00', fontFamily: 'var(--font-mono)', border: '1px solid rgba(255,221,0,0.2)', padding: '4px 12px', borderRadius: '4px', background: 'rgba(255,221,0,0.04)' }}>
                                 PLACA: {osintResult.placa} · SUNARP PERÚ
@@ -1581,9 +1700,194 @@ function App() {
                                 {estado && <div className="terminal-row" style={{ borderBottom: 'none' }}><span className="terminal-label" style={{ color: '#ffdd00' }}>Estado Registral:</span><span className="terminal-value">{estado}</span></div>}
                               </div>
                             )}
-                          </div>
+                          </>
                         );
                       })()}
+                      {osintModule === 'den' && (
+                        <div>
+                          <div style={{ marginBottom: '12px', borderBottom: '1px dashed rgba(255,0,85,0.3)', paddingBottom: '10px', display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '11px', color: '#ff0055', fontFamily: 'var(--font-mono)' }}>RÉCORD DE DENUNCIAS PNP · {osintResult.cantidad_denuncias} REGISTROS</span>
+                            <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>DNI: {osintResult.consulta}</span>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {(osintResult.denuncias || []).map((d, i) => {
+                              const badgeColor = d.tipo === 'DENUNCIADO' || d.tipo === 'AGRESOR' ? '#ff3366' : d.tipo === 'AGRAVIADO' ? '#ffaa00' : '#00aaff';
+                              return (
+                                <div key={i} style={{ padding: '12px', border: '1px solid rgba(255,0,85,0.15)', borderRadius: '8px', background: 'rgba(255,0,85,0.02)' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                    <span style={{ fontSize: '12px', color: '#ff0055', fontFamily: 'var(--font-mono)', fontWeight: 'bold' }}>DENUNCIA #{d.numero}</span>
+                                    <span style={{ fontSize: '9px', background: `${badgeColor}18`, border: `1px solid ${badgeColor}`, color: badgeColor, padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold', fontFamily: 'var(--font-mono)', letterSpacing: '0.5px' }}>{d.tipo}</span>
+                                  </div>
+                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '11px', marginBottom: '8px' }}>
+                                    <div className="terminal-row" style={{ paddingTop: 0 }}><span className="terminal-label">Comisaría:</span><span className="terminal-value">{d.comisaria || '-'}</span></div>
+                                    <div className="terminal-row" style={{ paddingTop: 0 }}><span className="terminal-label">N° Orden:</span><span className="terminal-value">{d.n_orden || '-'}</span></div>
+                                    <div className="terminal-row" style={{ borderBottom: 'none' }}><span className="terminal-label">Fecha Hecho:</span><span className="terminal-value">{d.f_hecho || '-'}</span></div>
+                                    <div className="terminal-row" style={{ borderBottom: 'none' }}><span className="terminal-label">Fecha Reg:</span><span className="terminal-value">{d.f_registro || '-'}</span></div>
+                                  </div>
+                                  {d.condicion && <div style={{ fontSize: '10px', color: '#fff', opacity: 0.7, fontFamily: 'monospace', background: 'rgba(0,0,0,0.3)', padding: '4px 6px', borderRadius: '4px', marginBottom: '6px' }}>Condición: {d.condicion}</div>}
+                                  {d.resumen && (
+                                    <div style={{ marginTop: '8px', borderTop: '1px dashed rgba(255,255,255,0.1)', paddingTop: '6px' }}>
+                                      <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.4)', fontFamily: 'var(--font-mono)', display: 'block', marginBottom: '2px' }}>[ RESUMEN DE HECHOS ]</span>
+                                      <p style={{ margin: 0, fontSize: '11px', color: '#ffb3c6', fontFamily: 'Courier New, monospace', lineHeight: '1.4', whiteSpace: 'pre-wrap' }}>{d.resumen}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                      {osintModule === 'den_pdf' && (
+                        <div>
+                          <div style={{ marginBottom: '12px', borderBottom: '1px dashed rgba(255,85,0,0.3)', paddingBottom: '10px', display: 'flex', justifyContent: 'space-between' }}>
+                            <span style={{ fontSize: '11px', color: '#ff5500', fontFamily: 'var(--font-mono)' }}>ACTAS DE DENUNCIA PNP DISPONIBLES · {osintResult.cantidad_denuncias} ARCHIVOS</span>
+                            <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>DNI: {osintResult.consulta}</span>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {(osintResult.denuncias || []).map((d, i) => (
+                              <div key={i} style={{ padding: '14px', border: '1px solid rgba(255,85,0,0.2)', borderRadius: '8px', background: 'rgba(255,85,0,0.02)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                  <span style={{ fontSize: '12px', color: '#ff5500', fontFamily: 'var(--font-mono)', fontWeight: 'bold' }}>EXPEDIENTE #{d.numero}</span>
+                                  <span style={{ fontSize: '9px', background: 'rgba(255,85,0,0.1)', border: '1px solid #ff5500', color: '#ff5500', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>{d.tipo}</span>
+                                </div>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '11px' }}>
+                                  <div className="terminal-row" style={{ paddingTop: 0 }}><span className="terminal-label">Comisaría:</span><span className="terminal-value">{d.comisaria}</span></div>
+                                  <div className="terminal-row" style={{ paddingTop: 0 }}><span className="terminal-label">N° Orden:</span><span className="terminal-value">{d.n_orden}</span></div>
+                                  <div className="terminal-row" style={{ borderBottom: 'none' }}><span className="terminal-label">Fecha Hecho:</span><span className="terminal-value">{d.f_hecho}</span></div>
+                                  <div className="terminal-row" style={{ borderBottom: 'none' }}><span className="terminal-label">Fecha Registro:</span><span className="terminal-value">{d.f_registro}</span></div>
+                                </div>
+                                <button type="button" onClick={() => handleDownloadBase64PDF(d.data_uri, d.nombre)}
+                                  style={{
+                                    width: '100%',
+                                    marginTop: '4px',
+                                    padding: '10px',
+                                    background: 'rgba(255,85,0,0.15)',
+                                    border: '1px solid #ff5500',
+                                    borderRadius: '6px',
+                                    color: '#ff661a',
+                                    fontWeight: 'bold',
+                                    fontSize: '11px',
+                                    fontFamily: 'var(--font-mono)',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    transition: 'all 0.2s'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = 'rgba(255,85,0,0.3)';
+                                    e.currentTarget.style.boxShadow = '0 0 10px rgba(255,85,0,0.3)';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = 'rgba(255,85,0,0.15)';
+                                    e.currentTarget.style.boxShadow = 'none';
+                                  }}
+                                >
+                                  📥 Descargar Acta PNP Oficial (PDF)
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {osintModule === 'rqh' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                          <div style={{ marginBottom: '4px', borderBottom: '1px dashed rgba(255,0,204,0.3)', paddingBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '11px', color: '#ff00cc', fontFamily: 'var(--font-mono)' }}>REQUISITORIAS JUDICIALES & CAPTURAS (RQH)</span>
+                            <div style={{ display: 'flex', gap: '6px' }}>
+                              <span style={{ fontSize: '9px', background: osintResult.resumen_requisitorias?.activas > 0 ? 'rgba(255,0,0,0.2)' : 'rgba(0,255,0,0.1)', border: `1px solid ${osintResult.resumen_requisitorias?.activas > 0 ? '#ff3333' : '#00ff88'}`, color: osintResult.resumen_requisitorias?.activas > 0 ? '#ff3333' : '#00ff88', padding: '2px 5px', borderRadius: '4px', fontWeight: 'bold' }}>
+                                {osintResult.resumen_requisitorias?.activas > 0 ? `⚠️ ACTIVAS: ${osintResult.resumen_requisitorias?.activas}` : '✔️ SIN ORDEN DE CAPTURA ACTIVA'}
+                              </span>
+                              <span style={{ fontSize: '9px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.2)', color: 'rgba(255,255,255,0.6)', padding: '2px 5px', borderRadius: '4px' }}>
+                                TOTAL: {osintResult.resumen_requisitorias?.total || 0}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Datos Judiciales Personales */}
+                          {osintResult.datos_personales && (
+                            <div style={{ padding: '14px', border: '1px solid rgba(255,0,204,0.2)', borderRadius: '8px', background: 'rgba(255,0,204,0.02)' }}>
+                              <h4 style={{ color: '#fff', fontSize: '1.2rem', margin: '0 0 10px 0', fontWeight: 'bold' }}>{osintResult.datos_personales.nombres}</h4>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '11px' }}>
+                                <div className="terminal-row" style={{ paddingTop: 0 }}><span className="terminal-label">DNI:</span><span className="terminal-value">{osintResult.datos_personales.dni}</span></div>
+                                <div className="terminal-row" style={{ paddingTop: 0 }}><span className="terminal-label">Edad / Sexo:</span><span className="terminal-value">{osintResult.datos_personales.edad} años / {osintResult.datos_personales.sexo}</span></div>
+                                <div className="terminal-row"><span className="terminal-label">Estatura / Ocupación:</span><span className="terminal-value">{osintResult.datos_personales.estatura || '-'} / {osintResult.datos_personales.ocupacion || '-'}</span></div>
+                                <div className="terminal-row"><span className="terminal-label">Estado Civil:</span><span className="terminal-value">{osintResult.datos_personales.estado_civil || '-'}</span></div>
+                                <div className="terminal-row" style={{ borderBottom: 'none' }}><span className="terminal-label">Dirección:</span><span className="terminal-value" style={{ fontSize: '10px' }}>{osintResult.datos_personales.direccion || '-'}</span></div>
+                                <div className="terminal-row" style={{ borderBottom: 'none' }}><span className="terminal-label">Distrito / Ubigeo:</span><span className="terminal-value">{osintResult.datos_personales.distrito || '-'} // {osintResult.datos_personales.ubigeo || '-'}</span></div>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Detalle de Requisitorias */}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {(osintResult.detalle || []).map((rq, i) => {
+                              const isActive = rq.estado === 'ACTIVA';
+                              return (
+                                <div key={i} style={{ padding: '14px', border: `1px solid ${isActive ? 'rgba(255,0,0,0.3)' : 'rgba(255,255,255,0.1)'}`, borderRadius: '8px', background: isActive ? 'rgba(255,0,0,0.03)' : 'rgba(255,255,255,0.01)' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                                    <span style={{ fontSize: '12px', color: isActive ? '#ff3333' : '#a0aec0', fontFamily: 'var(--font-mono)', fontWeight: 'bold' }}>CAPTURA #{rq.numero} ({rq.anio})</span>
+                                    <span style={{ fontSize: '9px', background: isActive ? 'rgba(255,0,0,0.15)' : 'rgba(255,255,255,0.05)', border: `1px solid ${isActive ? '#ff3333' : 'rgba(255,255,255,0.2)'}`, color: isActive ? '#ff3333' : 'rgba(255,255,255,0.6)', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>
+                                      {isActive ? '⚠️ ORDEN DE CAPTURA EN VIGOR' : '✓ INACTIVA / LEVANTADA'}
+                                    </span>
+                                  </div>
+                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '11px', marginBottom: '8px' }}>
+                                    <div className="terminal-row" style={{ paddingTop: 0 }}><span className="terminal-label">Delito:</span><span className="terminal-value" style={{ color: isActive ? '#ff7e7e' : 'inherit', fontWeight: isActive ? 'bold' : 'normal' }}>{rq.delito}</span></div>
+                                    <div className="terminal-row" style={{ paddingTop: 0 }}><span className="terminal-label">Tipo / Proceso:</span><span className="terminal-value">{rq.tipo} // {rq.proceso}</span></div>
+                                    <div className="terminal-row"><span className="terminal-label">Expediente:</span><span className="terminal-value" style={{ fontFamily: 'monospace' }}>{rq.exp}</span></div>
+                                    <div className="terminal-row"><span className="terminal-label">N° Requisitoria:</span><span className="terminal-value" style={{ fontFamily: 'monospace' }}>{rq.nrq}</span></div>
+                                    <div className="terminal-row"><span className="terminal-label">Inicio / Vence:</span><span className="terminal-value">{rq.inicio} // {rq.vence}</span></div>
+                                    <div className="terminal-row"><span className="terminal-label">Cuaderno / Motivo:</span><span className="terminal-value">{rq.cuaderno} // {rq.motivo}</span></div>
+                                    <div className="terminal-row" style={{ borderBottom: 'none' }}><span className="terminal-label">Órgano / Secretaría:</span><span className="terminal-value">{rq.dependencia}<br/>{rq.secretario}</span></div>
+                                    <div className="terminal-row" style={{ borderBottom: 'none' }}><span className="terminal-label">Distrito Judicial:</span><span className="terminal-value">{rq.distrito}</span></div>
+                                  </div>
+                                  {rq.agraviada_o && <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.6)', fontFamily: 'monospace', borderTop: '1px dashed rgba(255,255,255,0.1)', paddingTop: '6px', marginTop: '6px' }}>Agraviado(a): {rq.agraviada_o}</div>}
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {/* Documentos Judiciales PDF */}
+                          {osintResult.documentos && osintResult.documentos.length > 0 && (
+                            <div style={{ borderTop: '1px dashed rgba(255,0,204,0.2)', paddingTop: '12px', marginTop: '4px' }}>
+                              <span style={{ fontSize: '10px', color: '#ff00cc', fontFamily: 'var(--font-mono)', display: 'block', marginBottom: '8px' }}>DOCUMENTACIÓN JUDICIAL OFICIAL DISPONIBLE:</span>
+                              {osintResult.documentos.map((doc, idx) => (
+                                <button key={idx} type="button" onClick={() => handleDownloadBase64PDF(doc.data_uri, doc.nombre)}
+                                  style={{
+                                    width: '100%',
+                                    padding: '10px',
+                                    background: 'rgba(255,0,204,0.12)',
+                                    border: '1px solid #ff00cc',
+                                    borderRadius: '6px',
+                                    color: '#ff33d6',
+                                    fontWeight: 'bold',
+                                    fontSize: '11px',
+                                    fontFamily: 'var(--font-mono)',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    transition: 'all 0.2s',
+                                    marginBottom: '6px'
+                                  }}
+                                  onMouseEnter={(e) => {
+                                    e.currentTarget.style.background = 'rgba(255,0,204,0.25)';
+                                    e.currentTarget.style.boxShadow = '0 0 10px rgba(255,0,204,0.25)';
+                                  }}
+                                  onMouseLeave={(e) => {
+                                    e.currentTarget.style.background = 'rgba(255,0,204,0.12)';
+                                    e.currentTarget.style.boxShadow = 'none';
+                                  }}
+                                >
+                                  ⚖ Descargar Resolución Judicial de Captura (PDF)
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </>
                   )}
                 </>
