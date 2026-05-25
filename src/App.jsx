@@ -52,9 +52,9 @@ const Facebook = ({ size = 24, ...props }) => (
   </svg>
 );
 
-const Twitter = ({ size = 24, ...props }) => (
+const Google = ({ size = 24, ...props }) => (
   <svg viewBox="0 0 24 24" width={size} height={size} stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" {...props}>
-    <path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z" />
+    <path d="M12.24 10.285V14.4h6.887c-.648 2.41-2.519 4.114-5.136 4.114A5.59 5.59 0 0 1 8.4 12.99a5.59 5.59 0 0 1 5.591-5.59c2.42 0 4.382 1.34 5.302 3.328l3.197-2.422C20.655 4.887 17.653 3 13.99 3c-4.97 0-9 4.03-9 9s4.03 9 9 9c4.767 0 8.783-3.23 9-8H12.24z" />
   </svg>
 );
 
@@ -1045,9 +1045,9 @@ function App() {
             </a>
             <a href="#" className="social-btn" onClick={(e) => {
               e.preventDefault();
-              alert('Autenticación mediante Twitter no configurada. Use el inicio de sesión de consola.');
+              alert('Autenticación mediante Google no configurada. Use el inicio de sesión de consola.');
             }}>
-              <Twitter size={16} /> Twitter
+              <Google size={16} /> Google
             </a>
           </div>
         </div>
