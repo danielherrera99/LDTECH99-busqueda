@@ -844,11 +844,11 @@ function App() {
     setSuccess('');
     
     if (!username.trim()) {
-      setError('Por favor, ingresa tu usuario (ldtech).');
+      setError('Por favor, ingresa tu usuario.');
       return;
     }
     if (!password) {
-      setError('Por favor, ingresa tu contraseña (19992015).');
+      setError('Por favor, ingresa tu contraseña.');
       return;
     }
 
@@ -1016,7 +1016,7 @@ function App() {
               </label>
               <a href="#" onClick={(e) => {
                 e.preventDefault();
-                alert('Pista: El usuario por defecto de desarrollo es "ldtech" y la contraseña es "19992015".');
+                alert('Contacte con ldtech99');
               }}>¿Olvidaste Contraseña?</a>
             </div>
 
