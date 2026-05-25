@@ -973,7 +973,7 @@ function App() {
               <input 
                 type="text" 
                 className="input-field" 
-                placeholder="Usuario (ldtech)"
+                placeholder="Usuario"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 disabled={loading}
@@ -986,7 +986,7 @@ function App() {
               <input 
                 type={showPassword ? "text" : "password"} 
                 className="input-field password-input" 
-                placeholder="Contraseña (19992015)"
+                placeholder="Contraseña"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
