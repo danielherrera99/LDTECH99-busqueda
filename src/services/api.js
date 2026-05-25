@@ -629,7 +629,7 @@ export const reniecService_legacy = reniecService;
 export const authService = {
   login: async (username, password) => {
     await sleep(1500);
-    if (username.trim().toLowerCase() === 'nnldtech' && password === '19992015') {
+    if (username.trim().toLowerCase() === 'ldtech' && password === '19992015') {
       const mockUser = { id: 'usr_ldtech99', username: 'Luis Daniel Herrera', email: 'luis.daniel@ldtech99.com', role: 'Director Técnico / Principal Developer', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80', token: 'ey.ldtech99.jwt.token.simulation' };
       localStorage.setItem('ldtech_token', mockUser.token);
       localStorage.setItem('ldtech_user', JSON.stringify(mockUser));
