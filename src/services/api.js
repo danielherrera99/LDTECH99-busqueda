@@ -939,6 +939,7 @@ export const denplaService = {
     } catch (err) {
       console.warn('[DENPLA FALLBACK]', err.message);
       await sleep(1500);
+      const samplePdf = 'data:application/pdf;base64,JVBERi0xLjQKJcFSnaerCgoxIDAgb2JqCjw8Ci9UeXBlIC9DYXRhbG9nCi9QYWdlcyAyIDAgUgo+PgplbmRvYmoKMiAwIG9iago8PAovVHlwZSAvUGFnZXMKL0tpZHMgWzMgMCBSXQovQ291bnQgMQo+PgplbmRvYmoKMyAwIG9iago8PAovVHlwZSAvUGFnZQovUGFyZW50IDIgMCBSCi9NZWRpYUJveCBbMCAwIDU5NSA4NDJdCi9Db250ZW50cyA0IDAgUgovUmVzb3VyY2VzIDw8Ci9Gb250IDw8Ci9GMiA8PAovVHlwZSAvRm9udAovU3VidHlwZSAvVHlwZTEKL0Jhc2VGb250IC9IZWx2ZXRpY2EtQm9sZAo+Pgo+Pgo+Pgo+PgplbmRvYmoKNCAwIG9iago8PAovTGVuZ3RoIDY5Cj4+CnN0cmVhbQpCVAovRjIgMTggVGYKNTYgNzgxIFRkCihERU5VTkNJQSBWRUhJQ1VMQVIgREVNTykgIFRqCkVUCmVuZHN0cmVhbQplbmRvYmoKeHJlZgowIDUKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDE1IDAwMDAwIG4gCjAwMDAwMDAwNzAgMDAwMDAgbigKMDAwMDAwMDEyMCAwMDAwMCBuIAowMDAwMDAwMjgxIDAwMDAwIG4gCnRyYWlsZXIKPDwKL1NpemUgNQovUm9vdCAxIDAgUgo+PgpzdGFydHhyZWYKNDEwCiUlRU9GCg==';
       return {
         success: true,
         source: 'LOCAL_FALLBACK',
@@ -948,25 +949,27 @@ export const denplaService = {
           denuncias: [
             {
               numero: 1,
-              tipo: 'CHOQUE CON DAÑOS MATERIALES',
-              comisaria: 'CPNP MONTERRICO',
-              n_orden: 'DP-2025-00124',
-              f_hecho: '12/03/2025 08:30:00 Hrs.',
-              f_registro: '12/03/2025 10:15:00 Hrs.',
-              condicion: 'PARTICIPANTE - VEHÍCULO A',
-              intervencion: 'ACTA DE INTERVENCIÓN Nro : 452-2025',
-              resumen: `CHOQUE LATERAL ENTRE EL VEHÍCULO DE PLACA ${cleanPlaca} Y UN VEHÍCULO PARTICULAR EN LA AV. JAVIER PRADO. SE REGISTRARON DAÑOS MATERIALES EN LA PUERTA LATERAL DERECHA.`
+              tipo: 'DENUNCIANTE',
+              comisaria: 'CPNP ATE',
+              n_orden: '04664163',
+              f_hecho: '21/11/2014 17:20:00 Hrs.',
+              f_registro: '21/11/2014 21:41:41 Hrs.',
+              nombre: `DENUNCIAS-POLICIALES-${cleanPlaca}-1.pdf`,
+              mime: 'application/pdf',
+              extension: '.pdf',
+              data_uri: samplePdf
             },
             {
               numero: 2,
-              tipo: 'VEHÍCULO ABANDONADO EN LA VÍA PÚBLICA',
-              comisaria: 'CPNP SAN BORJA',
-              n_orden: 'DP-2024-00985',
-              f_hecho: '18/11/2024 23:45:00 Hrs.',
-              f_registro: '19/11/2024 02:30:00 Hrs.',
-              condicion: 'VEHÍCULO REMOLCADO al DEPÓSITO',
-              intervencion: 'PARTE POLICIAL Nro : 882-2024',
-              resumen: `REPORTE POR ABANDONO DE VEHÍCULO CON PLACA ${cleanPlaca} EN ZONA RÍGIDA DE LA AV. AVIACIÓN. EL VEHÍCULO FUE TRASLADADO POR LA GRÚA MUNICIPAL AL DEPÓSITO OFICIAL.`
+              tipo: 'DENUNCIADO',
+              comisaria: 'CPNP LA MOLINA',
+              n_orden: '05819472',
+              f_hecho: '15/05/2022 14:10:00 Hrs.',
+              f_registro: '15/05/2022 18:25:00 Hrs.',
+              nombre: `DENUNCIAS-POLICIALES-${cleanPlaca}-2.pdf`,
+              mime: 'application/pdf',
+              extension: '.pdf',
+              data_uri: samplePdf
             }
           ]
         }

@@ -2280,18 +2280,37 @@ function App() {
                                       N° {den.n_orden}
                                     </span>
                                   </div>
-                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '11px', marginBottom: '8px' }}>
+                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '11px', marginBottom: '12px' }}>
                                     <div className="terminal-row" style={{ paddingTop: 0 }}><span className="terminal-label">Comisaría:</span><span className="terminal-value">{den.comisaria}</span></div>
-                                    <div className="terminal-row" style={{ paddingTop: 0 }}><span className="terminal-label">Condición:</span><span className="terminal-value" style={{ color: '#ff4d94' }}>{den.condicion}</span></div>
+                                    <div className="terminal-row" style={{ paddingTop: 0 }}><span className="terminal-label">N° Orden:</span><span className="terminal-value">{den.n_orden}</span></div>
                                     <div className="terminal-row" style={{ borderBottom: 'none' }}><span className="terminal-label">Fecha Hecho:</span><span className="terminal-value">{den.f_hecho}</span></div>
                                     <div className="terminal-row" style={{ borderBottom: 'none' }}><span className="terminal-label">Fecha Registro:</span><span className="terminal-value">{den.f_registro}</span></div>
-                                    {den.intervencion && den.intervencion !== '-' && (
-                                      <div className="terminal-row" style={{ gridColumn: 'span 2', borderBottom: 'none' }}><span className="terminal-label">Intervención:</span><span className="terminal-value">{den.intervencion}</span></div>
-                                    )}
                                   </div>
-                                  <div style={{ padding: '10px', background: 'rgba(0,0,0,0.5)', borderRadius: '6px', borderLeft: '3px solid #00e5ff', fontSize: '11px', lineHeight: '1.4', color: 'rgba(255,255,255,0.8)' }}>
-                                    {den.resumen}
-                                  </div>
+                                  {den.data_uri && (
+                                    <button type="button" onClick={() => handleDownloadBase64PDF(den.data_uri, den.nombre)}
+                                      style={{
+                                        width: '100%',
+                                        padding: '8px',
+                                        background: 'rgba(0,229,255,0.12)',
+                                        border: '1px solid #00e5ff',
+                                        borderRadius: '6px',
+                                        color: '#00e5ff',
+                                        fontWeight: 'bold',
+                                        fontSize: '11px',
+                                        fontFamily: 'var(--font-mono)',
+                                        cursor: 'pointer',
+                                        display: 'flex',
+                                        justifyContent: 'center',
+                                        alignItems: 'center',
+                                        gap: '6px',
+                                        transition: 'all 0.2s'
+                                      }}
+                                      onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(0,229,255,0.25)'; e.currentTarget.style.boxShadow = '0 0 10px rgba(0,229,255,0.25)'; }}
+                                      onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(0,229,255,0.12)'; e.currentTarget.style.boxShadow = 'none'; }}
+                                    >
+                                      📥 Descargar Copia Certificada de Denuncia (PDF)
+                                    </button>
+                                  )}
                                 </div>
                               ))}
                             </div>
