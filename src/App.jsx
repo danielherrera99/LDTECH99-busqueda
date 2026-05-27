@@ -45,7 +45,8 @@ import {
   platService,
   hsoatService,
   facialService,
-  facialTopService
+  facialTopService,
+  denplaService
 } from './services/api';
 import './App.css';
 
@@ -189,22 +190,23 @@ function App() {
 
   // ─── Mapa de configuraciones por módulo ──────────────────────────────────────
   const MODULE_CONFIG = {
-    ruc:        { label: 'CONSULTAR_RUC()',         cost: '1 Pet',   color: '#00ff00', icon: '🏢', placeholder: '20538856674', maxLen: 11, validate: /^\d{11}$/, hint: '11 dígitos' },
-    dni_basic:  { label: 'CONSULTAR_DNI_BASIC()',   cost: '1 Pet',   color: '#00f2fe', icon: '👤', placeholder: '00000000',    maxLen: 8,  validate: /^\d{8}$/,  hint: '8 dígitos' },
-    dni_premium:{ label: 'CONSULTAR_DNI_PREMIUM()', cost: '2 Cred',  color: '#9b51e0', icon: '🪪', placeholder: '00000000',    maxLen: 8,  validate: /^\d{8}$/,  hint: '8 dígitos' },
-    dnit:       { label: 'CONSULTAR_DNIT_EXT()',    cost: '5 Cred',  color: '#ff6b35', icon: '🔏', placeholder: '00000000',    maxLen: 8,  validate: /^\d{8}$/,  hint: '8 dígitos' },
-    nm:         { label: 'CONSULTAR_NM()',          cost: '4 Cred',  color: '#ffaa00', icon: '🔍', placeholder: 'LUIS',          maxLen: 30, validate: /.{2,}/,    hint: 'n1 + ap1 + ap2' },
-    ag:         { label: 'CONSULTAR_AG()',          cost: '8 Cred',  color: '#ff4d94', icon: '🌳', placeholder: '00000000',    maxLen: 8,  validate: /^\d{8}$/,  hint: '8 dígitos' },
-    telp:       { label: 'CONSULTAR_TELP()',        cost: '15 Cred', color: '#00ff88', icon: '📱', placeholder: '00000000',    maxLen: 8,  validate: /^\d{8}$/,  hint: '8 dígitos' },
-    telp_cel:   { label: 'CONSULTAR_TELP_CEL()',   cost: '15 Cred', color: '#00aaff', icon: '📞', placeholder: '956041289',    maxLen: 9,  validate: /^\d{9}$/,  hint: '9 dígitos (celular)' },
-    pla:        { label: 'CONSULTAR_PLA()',         cost: '2 Cred',  color: '#ffdd00', icon: '🚗', placeholder: 'D5G960',        maxLen: 7,  validate: /^[A-Z0-9]{6,7}$/i, hint: '6-7 alfanuméricos' },
-    den:        { label: 'CONSULTAR_DENUNCIAS_PNP()', cost: '15 Cred', color: '#ff0055', icon: '🚨', placeholder: '00000000',    maxLen: 8,  validate: /^\d{8}$/,  hint: '8 dígitos (DNI)' },
-    den_pdf:    { label: 'DESCARGAR_DENUNCIAS_PDF()', cost: '30 Cred', color: '#ff5500', icon: '📄', placeholder: '00000000',    maxLen: 8,  validate: /^\d{8}$/,  hint: '8 dígitos (DNI)' },
-    rqh:        { label: 'CONSULTAR_REQUISITORIAS_RQH()', cost: '30 Cred', color: '#ff00cc', icon: '🔨', placeholder: '00000000',  maxLen: 8,  validate: /^\d{8}$/,  hint: '8 dígitos (DNI)' },
-    plat:       { label: 'CONSULTAR_PLAT_COMPLETO()', cost: '5 Cred',  color: '#ff7700', icon: '🚘', placeholder: 'D5G960',        maxLen: 7,  validate: /^[A-Z0-9]{6,7}$/i, hint: '6-7 alfanuméricos' },
-    hsoat:      { label: 'CONSULTAR_HSOAT()',         cost: '8 Cred',  color: '#00ccff', icon: '📋', placeholder: 'D5G960',        maxLen: 7,  validate: /^[A-Z0-9]{6,7}$/i, hint: '6-7 alfanuméricos' },
-    facial:     { label: 'RECONOCIMIENTO_FACIAL()',   cost: '45 Cred', color: '#ee0979', icon: '📸', placeholder: 'Foto Rostro',    maxLen: 250, validate: /^.*$/,    hint: 'Archivo de imagen (JPG, PNG)' },
-    facial_top: { label: 'RECONOCIMIENTO_FACIAL_TOP()', cost: '50 Cred', color: '#ff0077', icon: '🎭', placeholder: 'Foto Rostro',    maxLen: 250, validate: /^.*$/,    hint: 'Archivo de imagen (JPG, PNG)' },
+    ruc:        { label: 'Consulta RUC',              cost: '1 Peticiones', color: '#00ff00', icon: '🏢', placeholder: '20538856674', maxLen: 11, validate: /^\d{11}$/, hint: '11 dígitos' },
+    dni_basic:  { label: 'Consulta DNI',              cost: '1 Peticiones', color: '#00f2fe', icon: '👤', placeholder: '00000000',    maxLen: 8,  validate: /^\d{8}$/,  hint: '8 dígitos' },
+    dni_premium:{ label: 'Consulta DNI',              cost: '2 Créditos',   color: '#9b51e0', icon: '🪪', placeholder: '00000000',    maxLen: 8,  validate: /^\d{8}$/,  hint: '8 dígitos' },
+    dnit:       { label: 'Consulta DNIT',             cost: '5 Créditos',   color: '#ff6b35', icon: '🔏', placeholder: '00000000',    maxLen: 8,  validate: /^\d{8}$/,  hint: '8 dígitos' },
+    nm:         { label: 'Consulta NM',               cost: '4 Créditos',   color: '#ffaa00', icon: '🔍', placeholder: 'LUIS',          maxLen: 30, validate: /.{2,}/,    hint: 'n1 + ap1 + ap2' },
+    ag:         { label: 'Consulta AG',               cost: '8 Créditos',   color: '#ff4d94', icon: '🌳', placeholder: '00000000',    maxLen: 8,  validate: /^\d{8}$/,  hint: '8 dígitos' },
+    telp:       { label: 'Consulta TELP',             cost: '15 Créditos',  color: '#00ff88', icon: '📱', placeholder: '00000000',    maxLen: 8,  validate: /^\d{8}$/,  hint: '8 dígitos' },
+    telp_cel:   { label: 'Consulta TELP CEL',         cost: '15 Créditos',  color: '#00aaff', icon: '📞', placeholder: '956041289',    maxLen: 9,  validate: /^\d{9}$/,  hint: '9 dígitos (celular)' },
+    den:        { label: 'Consulta DEN',              cost: '15 Créditos',  color: '#ff0055', icon: '🚨', placeholder: '00000000',    maxLen: 8,  validate: /^\d{8}$/,  hint: '8 dígitos (DNI)' },
+    den_pdf:    { label: 'Consulta DENUNCIAS',        cost: '30 Créditos',  color: '#ff5500', icon: '📄', placeholder: '00000000',    maxLen: 8,  validate: /^\d{8}$/,  hint: '8 dígitos (DNI)' },
+    rqh:        { label: 'Consulta RQH',              cost: '30 Créditos',  color: '#ff00cc', icon: '🔨', placeholder: '00000000',  maxLen: 8,  validate: /^\d{8}$/,  hint: '8 dígitos (DNI)' },
+    facial:     { label: 'Consulta FACIAL',           cost: '45 Créditos',  color: '#ee0979', icon: '📸', placeholder: 'Foto Rostro',    maxLen: 250, validate: /^.*$/,    hint: 'Archivo de imagen (JPG, PNG)' },
+    facial_top: { label: 'Consulta FACIAL TOP',       cost: '25 Créditos',  color: '#ff0077', icon: '🎭', placeholder: 'Foto Rostro',    maxLen: 250, validate: /^.*$/,    hint: 'Archivo de imagen (JPG, PNG)' },
+    pla:        { label: 'Consulta PLA',              cost: '2 Créditos',   color: '#ffdd00', icon: '🚗', placeholder: 'D5G960',        maxLen: 7,  validate: /^[A-Z0-9]{6,7}$/i, hint: '6-7 alfanuméricos' },
+    denpla:     { label: 'Consulta DENPLA',           cost: '30 Créditos',  color: '#00e5ff', icon: '📁', placeholder: 'D5G960',        maxLen: 7,  validate: /^[A-Z0-9]{6,7}$/i, hint: '6-7 alfanuméricos' },
+    plat:       { label: 'Consulta PLAT',             cost: '5 Créditos',   color: '#ff7700', icon: '🚘', placeholder: 'D5G960',        maxLen: 7,  validate: /^[A-Z0-9]{6,7}$/i, hint: '6-7 alfanuméricos' },
+    hsoat:      { label: 'Consulta HSOAT',            cost: '8 Créditos',   color: '#00ccff', icon: '📋', placeholder: 'D5G960',        maxLen: 7,  validate: /^[A-Z0-9]{6,7}$/i, hint: '6-7 alfanuméricos' },
   };
 
   // ─── Manejador OSINT unificado (9 módulos) ──────────────────────────────────
@@ -262,6 +264,7 @@ function App() {
         case 'den':         response = await denService.consultarDen(cleanTarget, apiToken, mode); break;
         case 'den_pdf':     response = await denPdfService.consultarDenuncias(cleanTarget, apiToken, mode); break;
         case 'rqh':         response = await rqhService.consultarRqh(cleanTarget, apiToken, mode); break;
+        case 'denpla':      response = await denplaService.consultarDenpla(cleanTarget, apiToken, mode); break;
         case 'plat':        response = await platService.consultarPlat(cleanTarget, apiToken, mode); break;
         case 'hsoat':       response = await hsoatService.consultarHsoat(cleanTarget, apiToken, mode); break;
         case 'facial':      response = await facialService.consultarFacial(facialFile, apiToken, mode); break;
@@ -776,6 +779,46 @@ function App() {
           </thead>
           <tbody>
             ${soatRows || '<tr><td colspan="7" style="text-align:center;">Ningún registro de SOAT histórico.</td></tr>'}
+          </tbody>
+        </table>
+      `;
+    } else if (osintModule === 'denpla') {
+      const pnpRows = (osintResult.denuncias || []).map((d, i) => `
+        <tr>
+          <td>${d.numero}</td>
+          <td><strong style="color:#e53e3e;">${d.tipo}</strong></td>
+          <td>${d.comisaria || '-'}</td>
+          <td>${d.n_orden || '-'}</td>
+          <td>${d.f_hecho || '-'}</td>
+          <td>${d.f_registro || '-'}</td>
+        </tr>
+        ${d.resumen ? `
+        <tr>
+          <td colspan="6" style="background:#f7fafc; padding:8px; font-size:10px; font-family:Courier New, monospace; text-align:left;">
+            <strong>[Resumen de Hechos]:</strong> ${d.resumen}
+          </td>
+        </tr>
+        ` : ''}
+      `).join('');
+      contentHtml = `
+        <div class="title-banner">
+          <h2>REPORTE VEHICULAR: ANTECEDENTES Y DENUNCIAS PNP POR PLACA</h2>
+          <p style="margin: 4px 0 0 0; font-size: 12px; color: #4a5568;">Placa Consultada: <strong>${osintResult.placa || queryInput}</strong></p>
+        </div>
+        <div class="section-title">Registro Oficial de Denuncias Vehiculares por Placa</div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th style="width:30px;">N°</th>
+              <th>Tipo de Delito/Hecho</th>
+              <th>Comisaría Interviniente</th>
+              <th>N° Orden / Denuncia</th>
+              <th>Fecha Hecho</th>
+              <th>Fecha Registro</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${pnpRows || '<tr><td colspan="6" style="text-align:center;">Ninguna denuncia registrada para esta placa.</td></tr>'}
           </tbody>
         </table>
       `;
@@ -2215,6 +2258,42 @@ function App() {
                                   </div>
                                 );
                               })}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {osintModule === 'denpla' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                          <div style={{ marginBottom: '4px', borderBottom: '1px dashed rgba(0,229,255,0.3)', paddingBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '11px', color: '#00e5ff', fontFamily: 'var(--font-mono)' }}>DENUNCIAS POLICIALES POR PLACA (DENPLA)</span>
+                            <span className="terminal-glow-chip" style={{ background: 'rgba(0,229,255,0.1)', border: '1px solid #00e5ff', color: '#00e5ff' }}>PLACA: {osintResult.placa}</span>
+                          </div>
+
+                          <div>
+                            <span style={{ fontSize: '10px', color: '#00e5ff', fontFamily: 'var(--font-mono)', display: 'block', marginBottom: '10px' }}>HISTORIAL DE DENUNCIAS ASOCIADAS ({osintResult.cantidad_denuncias}):</span>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                              {(osintResult.denuncias || []).map((den, idx) => (
+                                <div key={idx} style={{ padding: '14px', border: '1px solid rgba(0,229,255,0.2)', borderRadius: '8px', background: 'rgba(0,229,255,0.02)' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                    <span style={{ fontSize: '12px', color: '#fff', fontWeight: 'bold' }}>{den.tipo}</span>
+                                    <span style={{ fontSize: '10px', color: '#00e5ff', fontFamily: 'var(--font-mono)', fontWeight: 'bold' }}>
+                                      N° {den.n_orden}
+                                    </span>
+                                  </div>
+                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '11px', marginBottom: '8px' }}>
+                                    <div className="terminal-row" style={{ paddingTop: 0 }}><span className="terminal-label">Comisaría:</span><span className="terminal-value">{den.comisaria}</span></div>
+                                    <div className="terminal-row" style={{ paddingTop: 0 }}><span className="terminal-label">Condición:</span><span className="terminal-value" style={{ color: '#ff4d94' }}>{den.condicion}</span></div>
+                                    <div className="terminal-row" style={{ borderBottom: 'none' }}><span className="terminal-label">Fecha Hecho:</span><span className="terminal-value">{den.f_hecho}</span></div>
+                                    <div className="terminal-row" style={{ borderBottom: 'none' }}><span className="terminal-label">Fecha Registro:</span><span className="terminal-value">{den.f_registro}</span></div>
+                                    {den.intervencion && den.intervencion !== '-' && (
+                                      <div className="terminal-row" style={{ gridColumn: 'span 2', borderBottom: 'none' }}><span className="terminal-label">Intervención:</span><span className="terminal-value">{den.intervencion}</span></div>
+                                    )}
+                                  </div>
+                                  <div style={{ padding: '10px', background: 'rgba(0,0,0,0.5)', borderRadius: '6px', borderLeft: '3px solid #00e5ff', fontSize: '11px', lineHeight: '1.4', color: 'rgba(255,255,255,0.8)' }}>
+                                    {den.resumen}
+                                  </div>
+                                </div>
+                              ))}
                             </div>
                           </div>
                         </div>
