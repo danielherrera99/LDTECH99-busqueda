@@ -1307,34 +1307,7 @@ function App() {
           {/* Panel de Control Izquierdo */}
           <div>
 
-            {/* Token Config */}
-            <div style={{ marginBottom: '20px' }}>
-              <h4 style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px', fontFamily: 'var(--font-mono)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Lock size={12} style={{ color: apiToken ? '#00ff00' : 'rgba(255,255,255,0.4)' }} /> [ CONFIG ] API_BEARER_TOKEN
-              </h4>
-              <div style={{ position: 'relative' }}>
-                <span style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: 'rgba(0,255,0,0.6)', whiteSpace: 'nowrap' }}>token:</span>
-                <input
-                  type={showToken ? 'text' : 'password'}
-                  value={apiToken}
-                  onChange={(e) => handleTokenChange(e.target.value)}
-                  style={{ background: 'rgba(0,0,0,0.9)', border: '1px solid rgba(0,255,0,0.4)', borderRadius: '6px', padding: '9px 38px 9px 62px', width: '100%', boxSizing: 'border-box', color: '#00ff00', fontFamily: 'Courier New, monospace', fontSize: '11px', outline: 'none' }}
-                />
-                <button type="button" onClick={() => setShowToken(!showToken)} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'rgba(0,255,0,0.6)', cursor: 'pointer', padding: 0, display: 'flex' }}>
-                  {showToken ? <EyeOff size={14} /> : <Eye size={14} />}
-                </button>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', marginTop: '8px', fontSize: '9px', fontFamily: 'var(--font-mono)', color: 'rgba(0,255,0,0.5)', border: '1px solid rgba(0,255,0,0.15)', padding: '6px 8px', borderRadius: '4px', background: 'rgba(0,0,0,0.4)' }}>
-                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                   <span>🏢 RUC & 👤 DNI BÁSICO:</span>
-                   <span style={{ color: '#00f2fe', fontWeight: 'bold' }}>⚡ AUTO-FREE TOKEN Inyectado</span>
-                 </div>
-                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                   <span>🪪 MÓDULOS PREMIUM:</span>
-                   <span style={{ color: '#9b51e0', fontWeight: 'bold' }}>🔒 Tu Token Premium Inyectado</span>
-                 </div>
-               </div>
-            </div>
+            {/* Token Config oculto en el panel visual para proteger la privacidad visual de las llaves */}
 
             {/* Gateway Mode Toggle */}
             <div style={{ marginBottom: '20px' }}>
