@@ -2621,14 +2621,7 @@ function App() {
             <span style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-bright)', fontFamily: 'var(--font-mono)' }}>LDTech99</span>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '6px' }}>Desarrollos de Software de Alta Gama & Integración Tecnológica</p>
           </div>
-          <div style={{ display: 'flex', gap: '15px' }}>
-            <a href="https://github.com/danielherrera99" target="_blank" rel="noopener noreferrer" className="badge-tech" style={{ padding: '8px 16px' }}>
-              <Github size={16} /> GitHub
-            </a>
-            <a href="https://linkedin.com" target="_blank" rel="noopener noreferrer" className="badge-tech" style={{ padding: '8px 16px' }}>
-              <Linkedin size={16} /> LinkedIn
-            </a>
-          </div>
+          {/* Enlaces sociales removidos para proteger la privacidad e identidad de la marca en modo reserva */}
         </div>
         <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
           <span>© 2026 LDTech99. Todos los derechos reservados.</span>
