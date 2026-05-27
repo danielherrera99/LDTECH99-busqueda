@@ -88,6 +88,31 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
+  const [showUserPanel, setShowUserPanel] = useState(false); // Modal de administración de usuarios
+  const [usersList, setUsersList] = useState(() => {
+    const saved = localStorage.getItem('ldtech_users');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) { console.warn(e); }
+    }
+    return [
+      { id: 'usr_ldtech', username: 'ldtech', password: '19992015', name: 'ldtech99', email: 'contacto@ldtech99.com', role: 'Administrador / Principal SysAdmin', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80', credits: '∞' },
+      { id: 'usr_cliente', username: 'cliente', password: 'cliente2026', name: 'Cliente Premium', email: 'cliente@ldtech99.com', role: 'Consultor Premium / Cliente', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&h=150&q=80', credits: 150 },
+      { id: 'usr_demo', username: 'demo', password: 'demo123', name: 'Usuario Demo', email: 'demo@ldtech99.com', role: 'Usuario de Pruebas / Demo', avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=150&h=150&q=80', credits: 20 }
+    ];
+  });
+
+  const handleUpdateUsers = (newUsers) => {
+    setUsersList(newUsers);
+    localStorage.setItem('ldtech_users', JSON.stringify(newUsers));
+  };
+
+  // --- Estados del Formulario de Gestión de Usuarios ---
+  const [formUser, setFormUser] = useState('');
+  const [formPass, setFormPass] = useState('');
+  const [formName, setFormName] = useState('');
+  const [formRole, setFormRole] = useState('Usuario de Pruebas / Demo');
+  const [formCredits, setFormCredits] = useState('20');
+  const [editingUserId, setEditingUserId] = useState(null);
 
   // --- Estados del Sistema OSINT (9 Módulos Codart) ---
   const [osintModule, setOsintModule] = useState('ruc'); // ruc|dni_basic|dni_premium|dnit|nm|ag|telp|telp_cel|pla
@@ -1234,7 +1259,29 @@ function App() {
         </nav>
 
         <div className="header-actions" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-          <div className="profile-badge" style={{ display: 'flex', alignItems: 'center', gap: '10px', background: 'rgba(255,255,255,0.03)', padding: '6px 12px', borderRadius: '8px', border: '1px solid var(--border-glass)' }}>
+          <div className="profile-badge" 
+            onClick={() => {
+              if (currentUser?.role?.toLowerCase()?.includes('admin') || currentUser?.username === 'ldtech99') {
+                setShowUserPanel(true);
+              } else {
+                alert('Acceso Restringido. Panel de Gestión disponible solo para Administradores.');
+              }
+            }}
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '10px', 
+              background: 'rgba(255,255,255,0.03)', 
+              padding: '6px 12px', 
+              borderRadius: '8px', 
+              border: '1px solid var(--border-glass)',
+              cursor: 'pointer',
+              transition: 'all 0.3s ease'
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.03)'; }}
+            title="Abrir Panel de Control y Usuarios"
+          >
             <img src={currentUser?.avatar} alt={currentUser?.username} style={{ width: '24px', height: '24px', borderRadius: '50%' }} />
             <span style={{ fontSize: '0.8rem', color: 'var(--text-bright)', fontFamily: 'var(--font-mono)' }}>{currentUser?.username}</span>
           </div>
@@ -1277,7 +1324,7 @@ function App() {
           marginBottom: '40px',
           lineHeight: '1.7'
         }}>
-          Diseño web a medida, arquitectura en la nube de alta disponibilidad y soluciones de software escalables. Desarrollado por Luis Daniel Herrera.
+          Diseño web a medida, arquitectura en la nube de alta disponibilidad y soluciones de software escalables. Desarrollado por LDTech99.
         </p>
 
         <div className="hero-ctas" style={{ display: 'flex', gap: '16px' }}>
@@ -2628,6 +2675,231 @@ function App() {
           <span>Desarrollado en Chiclayo, Perú.</span>
         </div>
       </footer>
+
+      {/* ─── MODAL DE GESTIÓN DE USUARIOS (LDTECH99 EXCLUSIVE CONTROL PANEL) ─── */}
+      {showUserPanel && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          background: 'rgba(0,0,0,0.85)',
+          backdropFilter: 'blur(10px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 9999,
+          padding: '20px',
+          boxSizing: 'border-box'
+        }}>
+          <div style={{
+            background: 'linear-gradient(135deg, rgba(10, 11, 20, 0.98) 0%, rgba(4, 5, 9, 0.99) 100%)',
+            border: '1px solid var(--accent-cyan)',
+            borderRadius: '12px',
+            width: '100%',
+            maxWidth: '800px',
+            maxHeight: '90%',
+            overflowY: 'auto',
+            padding: '30px',
+            boxSizing: 'border-box',
+            color: 'var(--text-main)',
+            boxShadow: '0 0 30px rgba(0, 242, 254, 0.2)',
+            fontFamily: 'Courier New, monospace'
+          }}>
+            {/* Cabecera */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(0, 242, 254, 0.3)', paddingBottom: '15px', marginBottom: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Users style={{ color: 'var(--accent-cyan)' }} size={24} />
+                <h2 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 'bold', color: '#fff', letterSpacing: '1px' }}>
+                  LDTECH99 CONTROL PANEL &mdash; USER DATABASE
+                </h2>
+              </div>
+              <button 
+                onClick={() => {
+                  setShowUserPanel(false);
+                  setEditingUserId(null);
+                  setFormUser(''); setFormPass(''); setFormName(''); setFormRole('Usuario de Pruebas / Demo'); setFormCredits('20');
+                }} 
+                style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.15)', borderRadius: '6px', color: '#ff7e7e', cursor: 'pointer', padding: '6px 12px', fontSize: '11px', fontWeight: 'bold' }}
+              >
+                [ CERRAR PANEL ]
+              </button>
+            </div>
+
+            {/* Formulario para Agregar/Editar Usuario */}
+            <div style={{ padding: '16px', background: 'rgba(0, 242, 254, 0.03)', border: '1px solid rgba(0, 242, 254, 0.15)', borderRadius: '8px', marginBottom: '24px' }}>
+              <h3 style={{ margin: '0 0 12px 0', fontSize: '0.9rem', color: 'var(--accent-cyan)', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                {editingUserId ? '⚡ MODIFICAR USUARIO SELECCIONADO' : '➕ REGISTRAR NUEVO ACCESO'}
+              </h3>
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                if (!formUser.trim() || !formPass.trim() || !formName.trim()) {
+                  alert('Por favor complete todos los campos obligatorios (Usuario, Contraseña y Nombre).');
+                  return;
+                }
+
+                if (editingUserId) {
+                  // Editar usuario existente
+                  const updated = usersList.map(u => {
+                    if (u.id === editingUserId) {
+                      return { 
+                        ...u, 
+                        username: formUser.trim().toLowerCase(), 
+                        password: formPass.trim(), 
+                        name: formName.trim(), 
+                        role: formRole, 
+                        credits: formCredits === '∞' ? '∞' : isNaN(parseInt(formCredits)) ? 0 : parseInt(formCredits) 
+                      };
+                    }
+                    return u;
+                  });
+                  handleUpdateUsers(updated);
+                  setEditingUserId(null);
+                  alert('Usuario actualizado con éxito en la base de datos local.');
+                } else {
+                  // Verificar duplicados
+                  if (usersList.some(u => u.username.toLowerCase() === formUser.trim().toLowerCase())) {
+                    alert('El nombre de usuario ya existe. Elija otro.');
+                    return;
+                  }
+
+                  const newUser = {
+                    id: 'usr_' + Math.random().toString(36).substr(2, 9),
+                    username: formUser.trim().toLowerCase(),
+                    password: formPass.trim(),
+                    name: formName.trim(),
+                    email: `${formUser.trim().toLowerCase()}@ldtech99.com`,
+                    role: formRole,
+                    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80',
+                    credits: formCredits === '∞' ? '∞' : isNaN(parseInt(formCredits)) ? 0 : parseInt(formCredits)
+                  };
+                  handleUpdateUsers([...usersList, newUser]);
+                  alert('Nuevo acceso de prueba creado con éxito en la base de datos local.');
+                }
+
+                // Limpiar formulario
+                setFormUser(''); setFormPass(''); setFormName(''); setFormRole('Usuario de Pruebas / Demo'); setFormCredits('20');
+              }} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>Nombre de Usuario (Login)</label>
+                  <input type="text" value={formUser} onChange={(e) => setFormUser(e.target.value)} placeholder="Ej: consultor123" required disabled={editingUserId === 'usr_ldtech'}
+                    style={{ background: 'rgba(0,0,0,0.8)', border: '1px solid rgba(0, 242, 254, 0.3)', borderRadius: '6px', padding: '8px', color: '#fff', fontSize: '12px', outline: 'none' }} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>Contraseña de Acceso</label>
+                  <input type="text" value={formPass} onChange={(e) => setFormPass(e.target.value)} placeholder="Ej: clave2026" required
+                    style={{ background: 'rgba(0,0,0,0.8)', border: '1px solid rgba(0, 242, 254, 0.3)', borderRadius: '6px', padding: '8px', color: '#fff', fontSize: '12px', outline: 'none' }} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>Nombre Completo Visual</label>
+                  <input type="text" value={formName} onChange={(e) => setFormName(e.target.value)} placeholder="Ej: Juan Pérez" required
+                    style={{ background: 'rgba(0,0,0,0.8)', border: '1px solid rgba(0, 242, 254, 0.3)', borderRadius: '6px', padding: '8px', color: '#fff', fontSize: '12px', outline: 'none' }} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>Créditos Iniciales</label>
+                  <input type="text" value={formCredits} onChange={(e) => setFormCredits(e.target.value)} placeholder="Ej: 100 o ∞" required disabled={editingUserId === 'usr_ldtech'}
+                    style={{ background: 'rgba(0,0,0,0.8)', border: '1px solid rgba(0, 242, 254, 0.3)', borderRadius: '6px', padding: '8px', color: '#fff', fontSize: '12px', outline: 'none' }} />
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', gridColumn: 'span 2' }}>
+                  <label style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>Rol asignado</label>
+                  <select value={formRole} onChange={(e) => setFormRole(e.target.value)} disabled={editingUserId === 'usr_ldtech'}
+                    style={{ background: 'rgba(0,0,0,0.8)', border: '1px solid rgba(0, 242, 254, 0.3)', borderRadius: '6px', padding: '8px', color: '#fff', fontSize: '12px', outline: 'none', cursor: 'pointer' }}>
+                    <option value="Administrador / Principal SysAdmin">Administrador / Principal SysAdmin</option>
+                    <option value="Consultor Premium / Cliente">Consultor Premium / Cliente</option>
+                    <option value="Usuario de Pruebas / Demo">Usuario de Pruebas / Demo</option>
+                  </select>
+                </div>
+                <button type="submit" 
+                  style={{ gridColumn: 'span 2', background: 'var(--accent-cyan)', border: '1px solid var(--accent-cyan)', color: '#000', padding: '10px', borderRadius: '6px', fontSize: '12px', fontWeight: 'bold', cursor: 'pointer', marginTop: '6px' }}
+                >
+                  {editingUserId ? 'APLICAR CAMBIOS ACCESO' : 'REGISTRAR Y ACTIVAR CREDENCIALES'}
+                </button>
+                {editingUserId && (
+                  <button type="button" onClick={() => {
+                    setEditingUserId(null);
+                    setFormUser(''); setFormPass(''); setFormName(''); setFormRole('Usuario de Pruebas / Demo'); setFormCredits('20');
+                  }}
+                    style={{ gridColumn: 'span 2', background: 'transparent', border: '1px solid rgba(255,255,255,0.3)', color: '#fff', padding: '8px', borderRadius: '6px', fontSize: '11px', cursor: 'pointer', marginTop: '6px' }}
+                  >
+                    [ CANCELAR EDICIÓN ]
+                  </button>
+                )}
+              </form>
+            </div>
+
+            {/* Listado de Accesos Configurados */}
+            <div>
+              <h3 style={{ margin: '0 0 12px 0', fontSize: '0.9rem', color: '#fff', textTransform: 'uppercase', letterSpacing: '1px' }}>
+                📋 LISTADO DE ACCESOS Y CREDENCIALES CONFIGURADAS ({usersList.length})
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {usersList.map((user) => {
+                  const isAdmin = user.id === 'usr_ldtech';
+                  return (
+                    <div key={user.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <img src={user.avatar} alt={user.username} style={{ width: '32px', height: '32px', borderRadius: '50%', border: '1px solid rgba(255,255,255,0.2)' }} />
+                        <div>
+                          <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#fff' }}>
+                            {user.name} <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 'normal', fontSize: '10px' }}>({user.username})</span>
+                          </div>
+                          <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)' }}>
+                            Rol: <span style={{ color: 'var(--accent-cyan)' }}>{user.role}</span> // Clave: <span style={{ color: '#00ff88' }}>{user.password}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                        <span className="terminal-glow-chip" style={{ background: 'rgba(0, 242, 254, 0.08)', color: 'var(--accent-cyan)', border: '1px solid rgba(0, 242, 254, 0.3)', margin: 0, padding: '3px 8px', fontSize: '10px' }}>
+                          ⚡ SALDO: {user.credits}
+                        </span>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          <button 
+                            type="button" 
+                            onClick={() => {
+                              setEditingUserId(user.id);
+                              setFormUser(user.username);
+                              setFormPass(user.password);
+                              setFormName(user.name);
+                              setFormRole(user.role);
+                              setFormCredits(String(user.credits));
+                            }}
+                            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.2)', borderRadius: '4px', color: '#00ff88', cursor: 'pointer', padding: '4px 8px', fontSize: '9px', fontWeight: 'bold' }}
+                          >
+                            [ EDITAR ]
+                          </button>
+                          <button 
+                            type="button" 
+                            disabled={isAdmin}
+                            onClick={() => {
+                              if (confirm(`¿Está seguro de eliminar de forma permanente el acceso para ${user.name}?`)) {
+                                const filtered = usersList.filter(u => u.id !== user.id);
+                                handleUpdateUsers(filtered);
+                              }
+                            }}
+                            style={{ 
+                              background: 'rgba(255,0,0,0.05)', 
+                              border: '1px solid rgba(255,0,0,0.2)', 
+                              borderRadius: '4px', 
+                              color: isAdmin ? 'rgba(255,255,255,0.1)' : '#ff7e7e', 
+                              cursor: isAdmin ? 'not-allowed' : 'pointer', 
+                              padding: '4px 8px', 
+                              fontSize: '9px', 
+                              fontWeight: 'bold' 
+                            }}
+                          >
+                            [ ELIMINAR ]
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }

@@ -308,7 +308,7 @@ export const telpCelService = {
       await sleep(800);
       return {
         success: true, source: 'LOCAL_FALLBACK',
-        data: { titulares_encontrados: 1, titulares: [{ titular: 'LUIS DANIEL HERRERA', operador: 'CLARO', telefono: numero, dni_ruc: '72345678', periodo: '202605', plan: 'Plan_Ilimitado_49.90', n_ip: null, correo: 'luis.daniel@ldtech99.com', empresa: 'AMERICA MOVIL PERU S.A.C.' }] },
+        data: { titulares_encontrados: 1, titulares: [{ titular: 'PROPIETARIO DEMO', operador: 'CLARO', telefono: numero, dni_ruc: '72345678', periodo: '202605', plan: 'Plan_Ilimitado_49.90', n_ip: null, correo: 'contacto@ldtech99.com', empresa: 'AMERICA MOVIL PERU S.A.C.' }] },
       };
     }
   },
@@ -532,7 +532,7 @@ export const rqhService = {
           consulta: dni,
           datos_personales: {
             dni: dni,
-            nombres: 'LUIS DANIEL HERRERA TANTALEAN',
+            nombres: 'JUAN PEREZ SANDOVAL',
             sexo: 'MASCULINO',
             fecha_nacimiento: '18/05/1998',
             edad: 27,
@@ -657,7 +657,7 @@ export const platService = {
               direccion: 'DIRECCIÓN DEMO 123 - LIMA'
             },
             {
-              nombres: 'LUIS DANIEL HERRERA',
+              nombres: 'PROPIETARIO DEMO DOS',
               partida: '11002233',
               le: '72345678',
               fecha_propietario: '15/08/2022',
@@ -758,7 +758,7 @@ export const facialService = {
             {
               dni: '72345678',
               porcentaje: 77.19,
-              nombre: 'LUIS DANIEL HERRERA'
+              nombre: 'COINCIDENCIA EJEMPLO DOS'
             },
             {
               dni: '00000003',
@@ -811,7 +811,7 @@ export const facialTopService = {
             {
               dni: '72345678',
               porcentaje: 77.19,
-              nombre: 'LUIS DANIEL HERRERA'
+              nombre: 'COINCIDENCIA EJEMPLO DOS'
             },
             {
               dni: '00000003',
@@ -829,17 +829,44 @@ export const facialTopService = {
 export const sunatService_legacy = sunatService;
 export const reniecService_legacy = reniecService;
 
-// ─── Auth Service (sin cambios) ──────────────────────────────────────────────
+// ─── Auth Service con base de datos simulada en localStorage ──────────────────
+const defaultUsers = [
+  { id: 'usr_ldtech', username: 'ldtech', password: '19992015', name: 'ldtech99', email: 'contacto@ldtech99.com', role: 'Administrador / Principal SysAdmin', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80', credits: '∞' },
+  { id: 'usr_cliente', username: 'cliente', password: 'cliente2026', name: 'Cliente Premium', email: 'cliente@ldtech99.com', role: 'Consultor Premium / Cliente', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&h=150&q=80', credits: 150 },
+  { id: 'usr_demo', username: 'demo', password: 'demo123', name: 'Usuario Demo', email: 'demo@ldtech99.com', role: 'Usuario de Pruebas / Demo', avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=150&h=150&q=80', credits: 20 }
+];
+
+if (!localStorage.getItem('ldtech_users')) {
+  localStorage.setItem('ldtech_users', JSON.stringify(defaultUsers));
+}
+
 export const authService = {
   login: async (username, password) => {
     await sleep(1500);
-    if (username.trim().toLowerCase() === 'ldtech' && password === '19992015') {
-      const mockUser = { id: 'usr_ldtech99', username: 'Luis Daniel Herrera', email: 'luis.daniel@ldtech99.com', role: 'Director Técnico / Principal Developer', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80', token: 'ey.ldtech99.jwt.token.simulation' };
+    const usersStr = localStorage.getItem('ldtech_users');
+    let users = [];
+    try {
+      users = usersStr ? JSON.parse(usersStr) : defaultUsers;
+    } catch(e) {
+      users = defaultUsers;
+    }
+
+    const found = users.find(u => u.username.trim().toLowerCase() === username.trim().toLowerCase() && u.password === password);
+    if (found) {
+      const mockUser = { 
+        id: found.id, 
+        username: found.name || found.username, 
+        email: found.email, 
+        role: found.role, 
+        avatar: found.avatar, 
+        credits: found.credits,
+        token: `ey.${found.username}.jwt.token.simulation` 
+      };
       localStorage.setItem('ldtech_token', mockUser.token);
       localStorage.setItem('ldtech_user', JSON.stringify(mockUser));
       return { success: true, user: mockUser };
     }
-    throw new Error('Credenciales inválidas. Intenta con "admin" y contraseña "admin123".');
+    throw new Error('Credenciales incorrectas. Verifique e intente de nuevo.');
   },
   getCurrentUser: async () => {
     const token = localStorage.getItem('ldtech_token');
