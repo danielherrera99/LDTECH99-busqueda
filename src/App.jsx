@@ -41,7 +41,11 @@ import {
   plaService,
   denService,
   denPdfService,
-  rqhService
+  rqhService,
+  platService,
+  hsoatService,
+  facialService,
+  facialTopService
 } from './services/api';
 import './App.css';
 
@@ -94,6 +98,8 @@ function App() {
   const [nmN1, setNmN1] = useState('');               // Nombre 1 (para NM)
   const [nmAp1, setNmAp1] = useState('');             // Apellido 1 (para NM)
   const [nmAp2, setNmAp2] = useState('');             // Apellido 2 (para NM)
+  const [facialFile, setFacialFile] = useState(null);  // Archivo binario para biométrico
+  const [facialPreview, setFacialPreview] = useState(''); // Vista previa base64/URL de la imagen cargada
 
   // Estado unificado de resultados
   const [osintLoading, setOsintLoading] = useState(false);
@@ -170,6 +176,10 @@ function App() {
     den:        { label: 'CONSULTAR_DENUNCIAS_PNP()', cost: '15 Cred', color: '#ff0055', icon: '🚨', placeholder: '00000000',    maxLen: 8,  validate: /^\d{8}$/,  hint: '8 dígitos (DNI)' },
     den_pdf:    { label: 'DESCARGAR_DENUNCIAS_PDF()', cost: '30 Cred', color: '#ff5500', icon: '📄', placeholder: '00000000',    maxLen: 8,  validate: /^\d{8}$/,  hint: '8 dígitos (DNI)' },
     rqh:        { label: 'CONSULTAR_REQUISITORIAS_RQH()', cost: '30 Cred', color: '#ff00cc', icon: '🔨', placeholder: '00000000',  maxLen: 8,  validate: /^\d{8}$/,  hint: '8 dígitos (DNI)' },
+    plat:       { label: 'CONSULTAR_PLAT_COMPLETO()', cost: '5 Cred',  color: '#ff7700', icon: '🚘', placeholder: 'D5G960',        maxLen: 7,  validate: /^[A-Z0-9]{6,7}$/i, hint: '6-7 alfanuméricos' },
+    hsoat:      { label: 'CONSULTAR_HSOAT()',         cost: '8 Cred',  color: '#00ccff', icon: '📋', placeholder: 'D5G960',        maxLen: 7,  validate: /^[A-Z0-9]{6,7}$/i, hint: '6-7 alfanuméricos' },
+    facial:     { label: 'RECONOCIMIENTO_FACIAL()',   cost: '45 Cred', color: '#ee0979', icon: '📸', placeholder: 'Foto Rostro',    maxLen: 250, validate: /^.*$/,    hint: 'Archivo de imagen (JPG, PNG)' },
+    facial_top: { label: 'RECONOCIMIENTO_FACIAL_TOP()', cost: '50 Cred', color: '#ff0077', icon: '🎭', placeholder: 'Foto Rostro',    maxLen: 250, validate: /^.*$/,    hint: 'Archivo de imagen (JPG, PNG)' },
   };
 
   // ─── Manejador OSINT unificado (9 módulos) ──────────────────────────────────
@@ -184,7 +194,9 @@ function App() {
 
     // Validación por módulo
     const cfg = MODULE_CONFIG[activeModule];
-    if (activeModule === 'nm') {
+    if (activeModule === 'facial' || activeModule === 'facial_top') {
+      if (!facialFile) { setOsintError('Por favor, selecciona o arrastra una imagen de rostro para comenzar el análisis.'); return; }
+    } else if (activeModule === 'nm') {
       if (!nmN1 || nmN1.length < 2) { setOsintError('Ingresa el primer nombre (mínimo 2 letras).'); return; }
       if (!nmAp1 || nmAp1.length < 2) { setOsintError('Ingresa el primer apellido (mínimo 2 letras).'); return; }
       if (!nmAp2 || nmAp2.length < 2) { setOsintError('Ingresa el segundo apellido (mínimo 2 letras).'); return; }
@@ -194,8 +206,9 @@ function App() {
     }
 
     // --- LÓGICA DE CACHE LOCAL ---
-    const cacheKey = `${activeModule}_${target.trim().toUpperCase()}`;
-    if (!forceRefresh && activeModule !== 'nm' && resultsCache[cacheKey]) {
+    const isFacial = activeModule === 'facial' || activeModule === 'facial_top';
+    const cacheKey = (!isFacial && target) ? `${activeModule}_${target.trim().toUpperCase()}` : '';
+    if (!forceRefresh && !isFacial && cacheKey && resultsCache[cacheKey]) {
       // Cargamos de inmediato desde la caché local sin llamadas de red (0ms de latencia, 0 créditos consumidos)
       setOsintResult(resultsCache[cacheKey].data);
       setOsintSource('LOCAL_CACHE');
@@ -210,7 +223,7 @@ function App() {
     try {
       let response;
       const mode = gatewayMode;
-      const cleanTarget = target.trim().toUpperCase();
+      const cleanTarget = (!isFacial && target) ? target.trim().toUpperCase() : '';
       switch (activeModule) {
         case 'ruc':         response = await sunatService.consultarRuc(cleanTarget, apiToken, mode); break;
         case 'dni_basic':   response = await reniecBasicService.consultarDni(cleanTarget, apiToken, mode); break;
@@ -224,6 +237,10 @@ function App() {
         case 'den':         response = await denService.consultarDen(cleanTarget, apiToken, mode); break;
         case 'den_pdf':     response = await denPdfService.consultarDenuncias(cleanTarget, apiToken, mode); break;
         case 'rqh':         response = await rqhService.consultarRqh(cleanTarget, apiToken, mode); break;
+        case 'plat':        response = await platService.consultarPlat(cleanTarget, apiToken, mode); break;
+        case 'hsoat':       response = await hsoatService.consultarHsoat(cleanTarget, apiToken, mode); break;
+        case 'facial':      response = await facialService.consultarFacial(facialFile, apiToken, mode); break;
+        case 'facial_top':  response = await facialTopService.consultarFacialTop(facialFile, apiToken, mode); break;
         default: throw new Error('Módulo no reconocido.');
       }
       
@@ -233,7 +250,7 @@ function App() {
         setOsintSource(response.source || 'CODART_X_API_V1');
         
         // Guardamos en la base de datos de caché local y en el historial
-        if (activeModule !== 'nm' && target) {
+        if (activeModule !== 'nm' && !isFacial && target) {
           const updatedCache = {
             ...resultsCache,
             [cacheKey]: {
@@ -651,6 +668,126 @@ function App() {
           </thead>
           <tbody>
             ${detailRows || '<tr><td colspan="7" style="text-align:center;">Ninguna requisitoria judicial registrada.</td></tr>'}
+          </tbody>
+        </table>
+      `;
+    } else if (osintModule === 'plat') {
+      const propRows = (osintResult.propietarios || []).map((prop, idx) => `
+        <tr>
+          <td>${idx + 1}</td>
+          <td><strong>${prop.nombres}</strong></td>
+          <td>${prop.le || '-'}</td>
+          <td>${prop.partida || 'NO INDICA'}</td>
+          <td>${prop.fecha_propietario || '-'}</td>
+          <td>${prop.direccion || '-'}</td>
+        </tr>
+      `).join('');
+      contentHtml = `
+        <div class="title-banner">
+          <h2>REPORTE VEHICULAR COMPLETO (PLAT)</h2>
+          <p style="margin: 4px 0 0 0; font-size: 12px; color: #4a5568;">Placa: <strong>${osintResult.placa}</strong></p>
+        </div>
+        
+        <div class="section-title">Datos Registrales y Mecánicos</div>
+        <div class="grid">
+          <div class="row"><span class="label">Placa:</span><span class="value">${osintResult.placa}</span></div>
+          <div class="row"><span class="label">N° Serie:</span><span class="value">${osintResult.numero_serie}</span></div>
+          <div class="row"><span class="label">N° VIN (Chasis):</span><span class="value">${osintResult.numero_vin}</span></div>
+          <div class="row"><span class="label">N° Motor:</span><span class="value">${osintResult.numero_motor}</span></div>
+          <div class="row"><span class="label">Marca / Modelo:</span><span class="value">${osintResult.caracteristicas?.marca} / ${osintResult.caracteristicas?.modelo}</span></div>
+          <div class="row"><span class="label">Estado de Vehículo:</span><span class="value" style="color:#00aa55; font-weight:bold;">${osintResult.caracteristicas?.estado}</span></div>
+          <div class="row"><span class="label">Combustible:</span><span class="value">${osintResult.caracteristicas?.tipo_combustible}</span></div>
+          <div class="row"><span class="label">Asientos / Pasajeros:</span><span class="value">${osintResult.extra?.asientos} / ${osintResult.extra?.pasajeros}</span></div>
+          <div class="row full-width" style="border-bottom:none;"><span class="label">Pesos (Neto / Bruto):</span><span class="value">${osintResult.extra?.peso_neto} t / ${osintResult.extra?.peso_bruto} t</span></div>
+        </div>
+
+        <div class="section-title">Historial de Propietarios Registrados</div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th style="width:30px;">N°</th>
+              <th>Propietario</th>
+              <th>DNI / RUC</th>
+              <th>N° Partida</th>
+              <th>Fecha Adquisición</th>
+              <th>Dirección Declarada</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${propRows || '<tr><td colspan="6" style="text-align:center;">Ningún propietario registrado.</td></tr>'}
+          </tbody>
+        </table>
+      `;
+    } else if (osintModule === 'hsoat') {
+      const soatRows = (osintResult.historial || []).map((soat, idx) => `
+        <tr>
+          <td>${idx + 1}</td>
+          <td><strong>${soat.compania}</strong></td>
+          <td><span style="font-weight:bold; color:${soat.estado === 'VIGENTE' ? '#00aa55' : '#e53e3e'}">${soat.estado}</span></td>
+          <td>${soat.poliza}</td>
+          <td>${soat.tipo_certificado}</td>
+          <td>${soat.uso} / ${soat.clase}</td>
+          <td>${soat.fecha_inicio} al ${soat.fecha_fin}</td>
+        </tr>
+      `).join('');
+      contentHtml = `
+        <div class="title-banner">
+          <h2>REPORTE HISTORIAL DE SOAT (HSOAT)</h2>
+          <p style="margin: 4px 0 0 0; font-size: 12px; color: #4a5568;">Placa: <strong>${osintResult.placa}</strong></p>
+        </div>
+        
+        <div class="section-title">Registros Históricos de Pólizas SOAT</div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th style="width:30px;">N°</th>
+              <th>Compañía</th>
+              <th>Estado</th>
+              <th>Póliza</th>
+              <th>Tipo Certificado</th>
+              <th>Uso / Clase</th>
+              <th>Vigencia Cobertura</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${soatRows || '<tr><td colspan="7" style="text-align:center;">Ningún registro de SOAT histórico.</td></tr>'}
+          </tbody>
+        </table>
+      `;
+    } else if (osintModule === 'facial' || osintModule === 'facial_top') {
+      const matchRows = (osintResult.coincidencias || []).map((m, idx) => `
+        <tr>
+          <td>${idx + 1}</td>
+          <td><strong>${m.nombre}</strong></td>
+          <td>${m.dni}</td>
+          <td><span style="font-weight:bold; color:#e53e3e;">${m.porcentaje}%</span></td>
+        </tr>
+      `).join('');
+      contentHtml = `
+        <div class="title-banner">
+          <h2>REPORTE OSINT: RECONOCIMIENTO BIOMÉTRICO FACIAL</h2>
+          <p style="margin: 4px 0 0 0; font-size: 12px; color: #4a5568;">Tipo de Análisis: <strong>Biométrico Comparativo ${osintModule === 'facial_top' ? '(TOP)' : ''}</strong></p>
+        </div>
+        
+        <div class="section-title">Análisis y Resultados Biométricos</div>
+        <div class="grid" style="margin-bottom:20px;">
+          <div class="row"><span class="label">Tipo de Búsqueda:</span><span class="value">Detección y Reconocimiento de Rostro</span></div>
+          <div class="row"><span class="label">Coincidencias Totales:</span><span class="value">${osintResult.coincidencias_totales || osintResult.coincidencias_mostradas || 3} encontrados</span></div>
+          <div class="row" style="border-bottom:none;"><span class="label">Coincidencias Mostradas:</span><span class="value">${osintResult.coincidencias_mostradas || 3}</span></div>
+        </div>
+
+        <div class="section-title">Coincidencias de Rostro Más Cercanas</div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th style="width:30px;">N°</th>
+              <th>Ciudadano / Identidad Detectada</th>
+              <th>DNI</th>
+              <th>Porcentaje de Coincidencia (Similitud)</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${matchRows || '<tr><td colspan="4" style="text-align:center;">Ninguna coincidencia de rostro registrada.</td></tr>'}
           </tbody>
         </table>
       `;
@@ -1245,13 +1382,89 @@ function App() {
                     </div>
                   ))}
                 </>
+              ) : osintModule === 'facial' || osintModule === 'facial_top' ? (
+                <div className="facial-upload-area" 
+                  style={{
+                    border: `1px dashed ${MODULE_CONFIG[osintModule]?.color}`,
+                    borderRadius: '8px',
+                    padding: '24px 15px',
+                    textAlign: 'center',
+                    background: 'rgba(0,0,0,0.6)',
+                    cursor: 'pointer',
+                    position: 'relative',
+                    transition: 'all 0.3s ease',
+                    boxShadow: `0 0 10px ${MODULE_CONFIG[osintModule]?.color}22`
+                  }}
+                  onDragOver={(e) => { e.preventDefault(); e.currentTarget.style.background = `${MODULE_CONFIG[osintModule]?.color}11`; }}
+                  onDragLeave={(e) => { e.currentTarget.style.background = 'rgba(0,0,0,0.6)'; }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    e.currentTarget.style.background = 'rgba(0,0,0,0.6)';
+                    const file = e.dataTransfer.files[0];
+                    if (file && file.type.startsWith('image/')) {
+                      setFacialFile(file);
+                      const reader = new FileReader();
+                      reader.onload = (ev) => setFacialPreview(ev.target.result);
+                      reader.readAsDataURL(file);
+                    }
+                  }}
+                  onClick={() => document.getElementById('facial-file-input').click()}
+                >
+                  <input 
+                    type="file" 
+                    id="facial-file-input" 
+                    accept="image/*" 
+                    style={{ display: 'none' }} 
+                    onChange={(e) => {
+                      const file = e.target.files[0];
+                      if (file) {
+                        setFacialFile(file);
+                        const reader = new FileReader();
+                        reader.onload = (ev) => setFacialPreview(ev.target.result);
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                  />
+                  {facialPreview ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
+                      <img 
+                        src={facialPreview} 
+                        alt="Rostro para análisis biométrico" 
+                        style={{ 
+                          width: '100px', 
+                          height: '100px', 
+                          borderRadius: '10px', 
+                          objectFit: 'cover', 
+                          border: `2px solid ${MODULE_CONFIG[osintModule]?.color}`,
+                          boxShadow: `0 0 15px ${MODULE_CONFIG[osintModule]?.color}`
+                        }} 
+                      />
+                      <span style={{ fontSize: '11px', color: 'var(--text-bright)', fontFamily: 'monospace' }}>
+                        {facialFile?.name} ({Math.round(facialFile?.size / 1024)} KB)
+                      </span>
+                      <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>
+                        [ CLICK PARA REEMPLAZAR FOTO ]
+                      </span>
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '2.5rem', filter: `drop-shadow(0 0 5px ${MODULE_CONFIG[osintModule]?.color})` }}>📸</span>
+                      <span style={{ fontSize: '0.8rem', color: MODULE_CONFIG[osintModule]?.color, fontWeight: 700, fontFamily: 'monospace' }}>
+                        CARGAR ARCHIVO BIOMÉTRICO
+                      </span>
+                      <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                        Arrastra una foto de rostro aquí o haz click para seleccionar
+                      </span>
+                    </div>
+                  )}
+                </div>
               ) : (
                 <div className="osint-input-wrapper" style={{ position: 'relative' }}>
                   <span className="osint-input-label" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', fontFamily: 'var(--font-mono)', fontSize: '0.75rem', color: `${MODULE_CONFIG[osintModule]?.color}99`, whiteSpace: 'nowrap' }}>
                     {osintModule}_query:
                   </span>
                   <input type="text" value={queryInput}
-                    onChange={e => setQueryInput(osintModule === 'pla' ? e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, MODULE_CONFIG[osintModule]?.maxLen) : e.target.value.replace(/\D/g, '').slice(0, MODULE_CONFIG[osintModule]?.maxLen))}
+                    onChange={e => setQueryInput((osintModule === 'pla' || osintModule === 'plat' || osintModule === 'hsoat') ? e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, MODULE_CONFIG[osintModule]?.maxLen) : e.target.value.replace(/\D/g, '').slice(0, MODULE_CONFIG[osintModule]?.maxLen))}
                     placeholder={MODULE_CONFIG[osintModule]?.placeholder}
                     maxLength={MODULE_CONFIG[osintModule]?.maxLen}
                     disabled={osintLoading}
@@ -1886,6 +2099,214 @@ function App() {
                               ))}
                             </div>
                           )}
+                        </div>
+                      )}
+                      {osintModule === 'plat' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                          <div style={{ marginBottom: '4px', borderBottom: '1px dashed rgba(255,119,0,0.3)', paddingBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '11px', color: '#ff7700', fontFamily: 'var(--font-mono)' }}>REGISTRO DE PROPIEDAD VEHICULAR COMPLETO (PLAT)</span>
+                            <span className="terminal-glow-chip" style={{ background: 'rgba(255,119,0,0.1)', border: '1px solid #ff7700', color: '#ff7700' }}>PLACA: {osintResult.placa}</span>
+                          </div>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+                            <div style={{ padding: '14px', border: '1px solid rgba(255,119,0,0.2)', borderRadius: '8px', background: 'rgba(255,119,0,0.02)' }}>
+                              <h5 style={{ color: '#ff7700', fontSize: '0.85rem', margin: '0 0 10px 0', fontFamily: 'var(--font-mono)', fontWeight: 'bold' }}>DATOS REGISTRALES</h5>
+                              <div className="terminal-row" style={{ paddingTop: 0 }}><span className="terminal-label">N° Serie:</span><span className="terminal-value" style={{ fontFamily: 'monospace' }}>{osintResult.numero_serie}</span></div>
+                              <div className="terminal-row"><span className="terminal-label">N° VIN (Chasis):</span><span className="terminal-value" style={{ fontFamily: 'monospace' }}>{osintResult.numero_vin}</span></div>
+                              <div className="terminal-row" style={{ borderBottom: 'none' }}><span className="terminal-label">N° Motor:</span><span className="terminal-value" style={{ fontFamily: 'monospace' }}>{osintResult.numero_motor}</span></div>
+                            </div>
+
+                            <div style={{ padding: '14px', border: '1px solid rgba(255,119,0,0.2)', borderRadius: '8px', background: 'rgba(255,119,0,0.02)' }}>
+                              <h5 style={{ color: '#ff7700', fontSize: '0.85rem', margin: '0 0 10px 0', fontFamily: 'var(--font-mono)', fontWeight: 'bold' }}>CARACTERÍSTICAS MECÁNICAS</h5>
+                              <div className="terminal-row" style={{ paddingTop: 0 }}><span className="terminal-label">Marca / Modelo:</span><span className="terminal-value">{osintResult.caracteristicas?.marca} // {osintResult.caracteristicas?.modelo}</span></div>
+                              <div className="terminal-row"><span className="terminal-label">Estado:</span><span className="terminal-value" style={{ color: '#00ff88' }}>{osintResult.caracteristicas?.estado}</span></div>
+                              <div className="terminal-row" style={{ borderBottom: 'none' }}><span className="terminal-label">Combustible:</span><span className="terminal-value">{osintResult.caracteristicas?.tipo_combustible}</span></div>
+                            </div>
+                          </div>
+
+                          <div style={{ padding: '14px', border: '1px solid rgba(255,119,0,0.15)', borderRadius: '8px', background: 'rgba(0,0,0,0.3)', fontSize: '11px' }}>
+                            <h5 style={{ color: '#ff7700', fontSize: '0.85rem', margin: '0 0 8px 0', fontFamily: 'var(--font-mono)', fontWeight: 'bold' }}>DETALLES DE CARGA & CAPACIDAD</h5>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                              <div className="terminal-row" style={{ paddingTop: 0 }}><span className="terminal-label">Asientos / Pasajeros:</span><span className="terminal-value">{osintResult.extra?.asientos} / {osintResult.extra?.pasajeros}</span></div>
+                              <div className="terminal-row" style={{ paddingTop: 0, borderBottom: 'none' }}><span className="terminal-label">Peso Neto / Bruto:</span><span className="terminal-value">{osintResult.extra?.peso_neto} t / {osintResult.extra?.peso_bruto} t</span></div>
+                            </div>
+                          </div>
+
+                          <div>
+                            <span style={{ fontSize: '10px', color: '#ff7700', fontFamily: 'var(--font-mono)', display: 'block', marginBottom: '8px' }}>HISTORIAL DE PROPIETARIOS REGISTRADOS:</span>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                              {(osintResult.propietarios || []).map((prop, idx) => (
+                                <div key={idx} style={{ padding: '12px', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', background: 'rgba(255,255,255,0.01)' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                                    <span style={{ fontSize: '11px', color: '#fff', fontWeight: 'bold' }}>{prop.nombres}</span>
+                                    <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>Partida: {prop.partida || 'NO INDICA'}</span>
+                                  </div>
+                                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', fontSize: '10px' }}>
+                                    <div>
+                                      <span style={{ color: 'rgba(255,255,255,0.4)' }}>Documento / LE: </span>
+                                      <span 
+                                        style={{ color: '#00ccff', cursor: 'pointer', textDecoration: 'underline' }}
+                                        onClick={() => {
+                                          if (prop.le && prop.le !== '00000000') {
+                                            setOsintModule(prop.le.length === 11 ? 'ruc' : 'dni_premium');
+                                            setQueryInput(prop.le);
+                                          }
+                                        }}
+                                        title="Click para consultar en consola"
+                                      >
+                                        {prop.le || '-'}
+                                      </span>
+                                    </div>
+                                    <div><span style={{ color: 'rgba(255,255,255,0.4)' }}>Fecha Transf: </span><span style={{ color: '#fff' }}>{prop.fecha_propietario}</span></div>
+                                    <div style={{ gridColumn: 'span 2' }}><span style={{ color: 'rgba(255,255,255,0.4)' }}>Dirección: </span><span style={{ color: '#fff' }}>{prop.direccion}</span></div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {osintModule === 'hsoat' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                          <div style={{ marginBottom: '4px', borderBottom: '1px dashed rgba(0,204,255,0.3)', paddingBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '11px', color: '#00ccff', fontFamily: 'var(--font-mono)' }}>HISTORIAL DE SEGURO OBLIGATORIO (HSOAT)</span>
+                            <span className="terminal-glow-chip" style={{ background: 'rgba(0,204,255,0.1)', border: '1px solid #00ccff', color: '#00ccff' }}>PLACA: {osintResult.placa}</span>
+                          </div>
+
+                          <div>
+                            <span style={{ fontSize: '10px', color: '#00ccff', fontFamily: 'var(--font-mono)', display: 'block', marginBottom: '10px' }}>REGISTROS DE COBERTURA DE ACCIDENTES ({osintResult.cantidad_registros}):</span>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                              {(osintResult.historial || []).map((soat, idx) => {
+                                const isVigente = soat.estado === 'VIGENTE';
+                                return (
+                                  <div key={idx} style={{ padding: '14px', border: `1px solid ${isVigente ? 'rgba(0,255,136,0.3)' : 'rgba(255,255,255,0.1)'}`, borderRadius: '8px', background: isVigente ? 'rgba(0,255,136,0.03)' : 'rgba(255,255,255,0.01)' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                                      <span style={{ fontSize: '12px', color: '#fff', fontWeight: 'bold' }}>{soat.compania}</span>
+                                      <span style={{ fontSize: '9px', background: isVigente ? 'rgba(0,255,136,0.15)' : 'rgba(255,0,0,0.15)', border: `1px solid ${isVigente ? '#00ff88' : '#ff3333'}`, color: isVigente ? '#00ff88' : '#ff3333', padding: '2px 6px', borderRadius: '4px', fontWeight: 'bold' }}>
+                                        {soat.estado}
+                                      </span>
+                                    </div>
+                                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', fontSize: '11px' }}>
+                                      <div className="terminal-row" style={{ paddingTop: 0 }}><span className="terminal-label">Póliza / Certificado:</span><span className="terminal-value" style={{ fontFamily: 'monospace' }}>{soat.poliza} // {soat.tipo_certificado}</span></div>
+                                      <div className="terminal-row" style={{ paddingTop: 0 }}><span className="terminal-label">Uso / Clase:</span><span className="terminal-value">{soat.uso} // {soat.clase}</span></div>
+                                      <div className="terminal-row" style={{ borderBottom: 'none' }}><span className="terminal-label">Vigencia Desde/Hasta:</span><span className="terminal-value" style={{ color: isVigente ? '#00ff88' : 'inherit' }}>{soat.fecha_inicio} al {soat.fecha_fin}</span></div>
+                                      <div className="terminal-row" style={{ borderBottom: 'none' }}><span className="terminal-label">Control Policial:</span><span className="terminal-value">{soat.control_policial}</span></div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {osintModule === 'facial' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                          <div style={{ marginBottom: '4px', borderBottom: '1px dashed rgba(238,9,121,0.3)', paddingBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '11px', color: '#ee0979', fontFamily: 'var(--font-mono)' }}>RECONOCIMIENTO BIOMÉTRICO FACIAL COMPLETO</span>
+                            <span className="terminal-glow-chip" style={{ background: 'rgba(238,9,121,0.1)', border: '1px solid #ee0979', color: '#ee0979' }}>COINCIDENCIAS: {osintResult.coincidencias_totales}</span>
+                          </div>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2.5fr', gap: '16px', alignItems: 'start' }}>
+                            {facialPreview && (
+                              <div style={{ textAlign: 'center' }}>
+                                <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: '6px', fontFamily: 'monospace' }}>ROSTRO DE ENTRADA</span>
+                                <img src={facialPreview} alt="Entrada" style={{ width: '100%', borderRadius: '8px', border: '1px solid #ee0979', boxShadow: '0 0 10px rgba(238,9,121,0.2)' }} />
+                              </div>
+                            )}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                              <span style={{ fontSize: '10px', color: '#ee0979', fontFamily: 'var(--font-mono)' }}>VECTORES Y COINCIDENCIAS BIOMÉTRICAS:</span>
+                              {(osintResult.coincidencias || []).map((match, i) => (
+                                <div key={i} style={{ padding: '10px 12px', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '6px', background: 'rgba(255,255,255,0.01)' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 'bold', color: '#fff', marginBottom: '4px' }}>
+                                    <span>{match.nombre}</span>
+                                    <span style={{ color: '#ee0979' }}>{match.porcentaje}% Similitud</span>
+                                  </div>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px' }}>
+                                    <span>DNI: {match.dni}</span>
+                                    <span 
+                                      style={{ color: '#00ccff', cursor: 'pointer', textDecoration: 'underline' }}
+                                      onClick={() => { setOsintModule('dni_premium'); setQueryInput(match.dni); }}
+                                    >
+                                      [ Ver Perfil OSINT ]
+                                    </span>
+                                  </div>
+                                  <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
+                                    <div style={{ width: `${match.porcentaje}%`, height: '100%', background: 'linear-gradient(90deg, #ee0979, #ff6a00)', borderRadius: '2px' }}></div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {osintResult.documentos && osintResult.documentos.length > 0 && (
+                            <div style={{ borderTop: '1px dashed rgba(238,9,121,0.2)', paddingTop: '12px', marginTop: '4px' }}>
+                              {osintResult.documentos.map((doc, idx) => (
+                                <button key={idx} type="button" onClick={() => handleDownloadBase64PDF(doc.data_uri, doc.nombre)}
+                                  style={{
+                                    width: '100%',
+                                    padding: '10px',
+                                    background: 'rgba(238,9,121,0.12)',
+                                    border: '1px solid #ee0979',
+                                    borderRadius: '6px',
+                                    color: '#ff2d9b',
+                                    fontWeight: 'bold',
+                                    fontSize: '11px',
+                                    fontFamily: 'var(--font-mono)',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    justifyContent: 'center',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    transition: 'all 0.2s'
+                                  }}
+                                  onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(238,9,121,0.25)'; e.currentTarget.style.boxShadow = '0 0 10px rgba(238,9,121,0.25)'; }}
+                                  onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(238,9,121,0.12)'; e.currentTarget.style.boxShadow = 'none'; }}
+                                >
+                                  📥 Descargar Expediente de Reconocimiento Facial Completo (PDF)
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                      {osintModule === 'facial_top' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                          <div style={{ marginBottom: '4px', borderBottom: '1px dashed rgba(255,0,119,0.3)', paddingBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '11px', color: '#ff0077', fontFamily: 'var(--font-mono)' }}>RECONOCIMIENTO BIOMÉTRICO DIRECTO (FACIAL TOP)</span>
+                            <span className="terminal-glow-chip" style={{ background: 'rgba(255,0,119,0.1)', border: '1px solid #ff0077', color: '#ff0077' }}>MEJOR COINCIDENCIA</span>
+                          </div>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 2.5fr', gap: '16px', alignItems: 'start' }}>
+                            {facialPreview && (
+                              <div style={{ textAlign: 'center' }}>
+                                <span style={{ fontSize: '9px', color: 'rgba(255,255,255,0.4)', display: 'block', marginBottom: '6px', fontFamily: 'monospace' }}>ROSTRO DE ENTRADA</span>
+                                <img src={facialPreview} alt="Entrada" style={{ width: '100%', borderRadius: '8px', border: '1px solid #ff0077', boxShadow: '0 0 10px rgba(255,0,119,0.2)' }} />
+                              </div>
+                            )}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                              <span style={{ fontSize: '10px', color: '#ff0077', fontFamily: 'var(--font-mono)' }}>RESULTADOS DE IDENTIFICACIÓN:</span>
+                              {(osintResult.coincidencias || []).map((match, i) => (
+                                <div key={i} style={{ padding: '10px 12px', border: `1px solid ${i === 0 ? 'rgba(255,0,119,0.3)' : 'rgba(255,255,255,0.08)'}`, borderRadius: '6px', background: i === 0 ? 'rgba(255,0,119,0.03)' : 'rgba(255,255,255,0.01)' }}>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', fontWeight: 'bold', color: '#fff', marginBottom: '4px' }}>
+                                    <span>{match.nombre}</span>
+                                    <span style={{ color: '#ff0077' }}>{match.porcentaje}% Match</span>
+                                  </div>
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: 'rgba(255,255,255,0.4)', marginBottom: '8px' }}>
+                                    <span>DNI: {match.dni}</span>
+                                    <span 
+                                      style={{ color: '#00ccff', cursor: 'pointer', textDecoration: 'underline' }}
+                                      onClick={() => { setOsintModule('dni_premium'); setQueryInput(match.dni); }}
+                                    >
+                                      [ Ver Perfil OSINT ]
+                                    </span>
+                                  </div>
+                                  <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.05)', borderRadius: '2px', overflow: 'hidden' }}>
+                                    <div style={{ width: `${match.porcentaje}%`, height: '100%', background: 'linear-gradient(90deg, #ff0077, #ff00c8)', borderRadius: '2px' }}></div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
                         </div>
                       )}
                     </>

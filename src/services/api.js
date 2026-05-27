@@ -621,6 +621,210 @@ export const rqhService = {
   }
 };
 
+export const platService = {
+  consultarPlat: async (placa, token, mode = 'direct') => {
+    if (mode === 'backend') {
+      return backendPost('/api/v1/consultas/fd/plat', { placa });
+    } else {
+      await sleep(1500);
+      const cleanPlaca = (placa || 'D5G960').trim().toUpperCase();
+      return {
+        success: true,
+        source: 'CODART_X_API_V1',
+        data: {
+          placa: cleanPlaca,
+          numero_serie: 'SERIE-DEMO-123456',
+          numero_vin: 'VIN-DEMO-123456789',
+          numero_motor: 'MOTOR-DEMO-4567',
+          caracteristicas: {
+            marca: 'MARCA DEMO',
+            modelo: 'MODELO DEMO',
+            estado: 'En circulación',
+            tipo_combustible: 'COMBUSTIBLE DEMO'
+          },
+          extra: {
+            asientos: '4',
+            pasajeros: '3',
+            peso_bruto: '2.10',
+            peso_neto: '1.45'
+          },
+          propietarios: [
+            {
+              nombres: 'PROPIETARIO DEMO S.A.C.',
+              partida: null,
+              le: '00000000',
+              fecha_propietario: '-',
+              direccion: 'DIRECCIÓN DEMO 123 - LIMA'
+            },
+            {
+              nombres: 'LUIS DANIEL HERRERA',
+              partida: '11002233',
+              le: '72345678',
+              fecha_propietario: '15/08/2022',
+              direccion: 'AV. BALTA NRO. 456 - CHICLAYO'
+            }
+          ]
+        }
+      };
+    }
+  }
+};
+
+export const hsoatService = {
+  consultarHsoat: async (placa, token, mode = 'direct') => {
+    if (mode === 'backend') {
+      return backendPost('/api/v1/consultas/fd/hsoat', { placa });
+    } else {
+      await sleep(1500);
+      const cleanPlaca = (placa || 'D5G960').trim().toUpperCase();
+      return {
+        success: true,
+        source: 'CODART_X_API_V1',
+        data: {
+          placa: cleanPlaca,
+          cantidad_registros: 3,
+          historial: [
+            {
+              compania: 'POSITIVA SEGUROS',
+              estado: 'VIGENTE',
+              tipo_certificado: 'DIGITAL',
+              uso: 'PARTICULAR',
+              clase: 'AUTOMOVIL',
+              poliza: 'POLIZA-SOAT-998822',
+              fecha_inicio: '01/01/2026',
+              fecha_fin: '01/01/2027',
+              control_policial: '01/01/2026'
+            },
+            {
+              compania: 'RIMAC SEGUROS S.A.',
+              estado: 'VENCIDO',
+              tipo_certificado: 'FISICO',
+              uso: 'PARTICULAR',
+              clase: 'AUTOMOVIL',
+              poliza: 'POLIZA-SOAT-775511',
+              fecha_inicio: '01/01/2025',
+              fecha_fin: '01/01/2026',
+              control_policial: '01/01/2025'
+            },
+            {
+              compania: 'PACIFICO SEGUROS',
+              estado: 'VENCIDO',
+              tipo_certificado: 'FISICO',
+              uso: 'PARTICULAR',
+              clase: 'AUTOMOVIL',
+              poliza: 'POLIZA-SOAT-443311',
+              fecha_inicio: '01/01/2024',
+              fecha_fin: '01/01/2025',
+              control_policial: '01/01/2024'
+            }
+          ]
+        }
+      };
+    }
+  }
+};
+
+export const facialService = {
+  consultarFacial: async (imageFile, token, mode = 'direct') => {
+    if (mode === 'backend') {
+      const formData = new FormData();
+      formData.append('image_facial', imageFile);
+      const activeToken = token || localStorage.getItem('sunat_token') || '';
+      const res = await fetch(`${CODART_DIRECT}/fd/facial`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${activeToken}`
+        },
+        body: formData
+      });
+      return res.json();
+    } else {
+      await sleep(2500);
+      const samplePdf = 'data:application/pdf;base64,JVBERi0xLjQKJcFSnaerCgoxIDAgb2JqCjw8Ci9UeXBlIC9DYXRhbG9nCi9QYWdlcyAyIDAgUgo+PgplbmRvYmoKMiAwIG9iago8PAovVHlwZSAvUGFnZXMKL0tpZHMgWzMgMCBSXQovQ291bnQgMQo+PgplbmRvYmoKMyAwIG9iago8PAovVHlwZSAvUGFnZQovUGFyZW50IDIgMCBSCi9NZWRpYUJveCBbMCAwIDU5NSA4NDJdCi9Db250ZW50cyA0IDAgUgovUmVzb3VyY2VzIDw8Ci9Gb250IDw8Ci9GMiA8PAovVHlwZSAvRm9udAovU3VidHlwZSAvVHlwZTEKL0Jhc2VGb250IC9IZWx2ZXRpY2EtQm9sZAo+Pgo+Pgo+Pgo+PgplbmRvYmoKNCAwIG9iago8PAovTGLenZ0aIDY5Cj4+CnN0cmVhbQpCVAovRjIgMTggVGYKNTYgNzgxIFRkCihSRVFVSVNJVE9SSUEgSlVESUNJQUwgT0ZJQ0lBTCBERU1PKSBUagpFVAplbmRvYmoKeHJlZgowIDUKMDAwMDAwMDAwMCA2NTUzNSBmIAowMDAwMDAwMDE1IDAwMDAwIG4gCjAwMDAwMDAwNzAgMDAwMDAgbigKMDAwMDAwMDEyMCAwMDAwMCBuIAowMDAwMDAwMjgxIDAwMDAwIG4gCnRyYWlsZXIKPDwKL1NpemUgNQovUm9vdCAxIDAgUgo+PgpzdGFydHhyZWYKNDEwCiUlRU9GCg==';
+      return {
+        success: true,
+        source: 'CODART_X_API_V1',
+        data: {
+          tipo_resultado: 'rostro',
+          coincidencias_mostradas: 3,
+          coincidencias_adicionales: 9,
+          coincidencias_totales: 12,
+          coincidencias: [
+            {
+              dni: '00000001',
+              porcentaje: 99.96,
+              nombre: 'PERSONA EJEMPLO UNO'
+            },
+            {
+              dni: '72345678',
+              porcentaje: 77.19,
+              nombre: 'LUIS DANIEL HERRERA'
+            },
+            {
+              dni: '00000003',
+              porcentaje: 76.76,
+              nombre: 'PERSONA EJEMPLO TRES'
+            }
+          ],
+          documentos: [
+            {
+              nombre: 'RECONOC-FACIAL-V1-3_0000000000-1.pdf',
+              mime: 'application/pdf',
+              extension: '.pdf',
+              data_uri: samplePdf
+            }
+          ]
+        }
+      };
+    }
+  }
+};
+
+export const facialTopService = {
+  consultarFacialTop: async (imageFile, token, mode = 'direct') => {
+    if (mode === 'backend') {
+      const formData = new FormData();
+      formData.append('image_facial', imageFile);
+      const activeToken = token || localStorage.getItem('sunat_token') || '';
+      const res = await fetch(`${CODART_DIRECT}/fd/facial/top`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${activeToken}`
+        },
+        body: formData
+      });
+      return res.json();
+    } else {
+      await sleep(2000);
+      return {
+        success: true,
+        source: 'CODART_X_API_V1',
+        data: {
+          tipo_resultado: 'rostro',
+          coincidencias_mostradas: 3,
+          coincidencias: [
+            {
+              dni: '00000001',
+              porcentaje: 99.96,
+              nombre: 'PERSONA EJEMPLO UNO'
+            },
+            {
+              dni: '72345678',
+              porcentaje: 77.19,
+              nombre: 'LUIS DANIEL HERRERA'
+            },
+            {
+              dni: '00000003',
+              porcentaje: 76.76,
+              nombre: 'PERSONA EJEMPLO TRES'
+            }
+          ]
+        }
+      };
+    }
+  }
+};
+
 // ─── SERVICIOS ORIGINALES (retrocompatibilidad con App.jsx actual) ───────────
 export const sunatService_legacy = sunatService;
 export const reniecService_legacy = reniecService;
