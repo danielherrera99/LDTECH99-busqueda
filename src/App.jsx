@@ -102,6 +102,17 @@ function App() {
     ];
   });
 
+  const fetchUsers = async () => {
+    try {
+      const data = await authService.getUsers();
+      if (data && data.length > 0) {
+        setUsersList(data);
+      }
+    } catch (e) {
+      console.warn('Error fetching users from database:', e);
+    }
+  };
+
   const handleUpdateUsers = (newUsers) => {
     setUsersList(newUsers);
     localStorage.setItem('ldtech_users', JSON.stringify(newUsers));
@@ -1033,6 +1044,8 @@ function App() {
         setIsAuthenticated(true);
         setCurrentUser(user);
       }
+      // Cargar lista de usuarios desde la base de datos relacional
+      await fetchUsers();
     };
     checkSession();
   }, []);
@@ -1063,6 +1076,9 @@ function App() {
       if (response.success) {
         setSuccess('¡Acceso concedido! Descifrando portal...');
         setCurrentUser(response.user);
+        
+        // Recargar los usuarios para que el panel administrativo tenga la última información
+        await fetchUsers();
         
         // Retardo para mostrar la animación de éxito antes de redirigir
         setTimeout(() => {
@@ -2830,58 +2846,53 @@ function App() {
               <h3 style={{ margin: '0 0 12px 0', fontSize: '0.9rem', color: 'var(--accent-cyan)', textTransform: 'uppercase', letterSpacing: '1px' }}>
                 {editingUserId ? '⚡ MODIFICAR USUARIO SELECCIONADO' : '➕ REGISTRAR NUEVO ACCESO'}
               </h3>
-              <form onSubmit={(e) => {
+              <form onSubmit={async (e) => {
                 e.preventDefault();
                 if (!formUser.trim() || !formPass.trim() || !formName.trim()) {
                   alert('Por favor complete todos los campos obligatorios (Usuario, Contraseña y Nombre).');
                   return;
                 }
 
-                if (editingUserId) {
-                  // Editar usuario existente
-                  const updated = usersList.map(u => {
-                    if (u.id === editingUserId) {
-                      return { 
-                        ...u, 
-                        username: formUser.trim().toLowerCase(), 
-                        password: formPass.trim(), 
-                        name: formName.trim(), 
-                        role: formRole, 
-                        credits: formCredits === '∞' ? '∞' : isNaN(parseInt(formCredits)) ? 0 : parseInt(formCredits) 
-                      };
-                    }
-                    return u;
-                  });
-                  handleUpdateUsers(updated);
-                  setEditingUserId(null);
-                  alert('Usuario actualizado con éxito en la base de datos local.');
-                } else {
-                  // Verificar duplicados
-                  if (usersList.some(u => u.username.toLowerCase() === formUser.trim().toLowerCase())) {
-                    alert('El nombre de usuario ya existe. Elija otro.');
-                    return;
+                try {
+                  const creditsVal = formCredits === '∞' ? '∞' : String(isNaN(parseInt(formCredits)) ? 0 : parseInt(formCredits));
+                  
+                  if (editingUserId) {
+                    // Editar usuario existente
+                    await authService.updateUser(editingUserId, {
+                      name: formName.trim(),
+                      username: formUser.trim().toLowerCase(),
+                      password: formPass.trim(),
+                      email: `${formUser.trim().toLowerCase()}@ldtech99.com`,
+                      role: formRole,
+                      credits: creditsVal
+                    });
+                    setEditingUserId(null);
+                    alert('Usuario actualizado con éxito en la base de datos centralizada.');
+                  } else {
+                    // Crear nuevo usuario
+                    await authService.createUser({
+                      name: formName.trim(),
+                      username: formUser.trim().toLowerCase(),
+                      password: formPass.trim(),
+                      email: `${formUser.trim().toLowerCase()}@ldtech99.com`,
+                      role: formRole,
+                      credits: creditsVal
+                    });
+                    alert('Nuevo acceso creado con éxito en la base de datos centralizada.');
                   }
 
-                  const newUser = {
-                    id: 'usr_' + Math.random().toString(36).substr(2, 9),
-                    username: formUser.trim().toLowerCase(),
-                    password: formPass.trim(),
-                    name: formName.trim(),
-                    email: `${formUser.trim().toLowerCase()}@ldtech99.com`,
-                    role: formRole,
-                    avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80',
-                    credits: formCredits === '∞' ? '∞' : isNaN(parseInt(formCredits)) ? 0 : parseInt(formCredits)
-                  };
-                  handleUpdateUsers([...usersList, newUser]);
-                  alert('Nuevo acceso de prueba creado con éxito en la base de datos local.');
-                }
+                  // Recargar lista de usuarios desde la base de datos
+                  await fetchUsers();
 
-                // Limpiar formulario
-                setFormUser(''); setFormPass(''); setFormName(''); setFormRole('Usuario de Pruebas / Demo'); setFormCredits('20');
+                  // Limpiar formulario
+                  setFormUser(''); setFormPass(''); setFormName(''); setFormRole('Usuario de Pruebas / Demo'); setFormCredits('20');
+                } catch (error) {
+                  alert(`Error al procesar el usuario: ${error.message}`);
+                }
               }} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <label style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>Nombre de Usuario (Login)</label>
-                  <input type="text" value={formUser} onChange={(e) => setFormUser(e.target.value)} placeholder="Ej: consultor123" required disabled={editingUserId === 'usr_ldtech'}
+                  <input type="text" value={formUser} onChange={(e) => setFormUser(e.target.value)} placeholder="Ej: consultor123" required disabled={editingUserId === 'usr_ldtech' || (usersList.find(u => u.id === editingUserId)?.username === 'ldtech')}
                     style={{ background: 'rgba(0,0,0,0.8)', border: '1px solid rgba(0, 242, 254, 0.3)', borderRadius: '6px', padding: '8px', color: '#fff', fontSize: '12px', outline: 'none' }} />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -2896,12 +2907,12 @@ function App() {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                   <label style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>Créditos Iniciales</label>
-                  <input type="text" value={formCredits} onChange={(e) => setFormCredits(e.target.value)} placeholder="Ej: 100 o ∞" required disabled={editingUserId === 'usr_ldtech'}
+                  <input type="text" value={formCredits} onChange={(e) => setFormCredits(e.target.value)} placeholder="Ej: 100 o ∞" required disabled={editingUserId === 'usr_ldtech' || (usersList.find(u => u.id === editingUserId)?.username === 'ldtech')}
                     style={{ background: 'rgba(0,0,0,0.8)', border: '1px solid rgba(0, 242, 254, 0.3)', borderRadius: '6px', padding: '8px', color: '#fff', fontSize: '12px', outline: 'none' }} />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', gridColumn: 'span 2' }}>
                   <label style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase' }}>Rol asignado</label>
-                  <select value={formRole} onChange={(e) => setFormRole(e.target.value)} disabled={editingUserId === 'usr_ldtech'}
+                  <select value={formRole} onChange={(e) => setFormRole(e.target.value)} disabled={editingUserId === 'usr_ldtech' || (usersList.find(u => u.id === editingUserId)?.username === 'ldtech')}
                     style={{ background: 'rgba(0,0,0,0.8)', border: '1px solid rgba(0, 242, 254, 0.3)', borderRadius: '6px', padding: '8px', color: '#fff', fontSize: '12px', outline: 'none', cursor: 'pointer' }}>
                     <option value="Administrador / Principal SysAdmin">Administrador / Principal SysAdmin</option>
                     <option value="Consultor Premium / Cliente">Consultor Premium / Cliente</option>
@@ -2933,7 +2944,7 @@ function App() {
               </h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 {usersList.map((user) => {
-                  const isAdmin = user.id === 'usr_ldtech';
+                  const isAdmin = user.username === 'ldtech';
                   return (
                     <div key={user.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', background: 'rgba(255,255,255,0.01)', border: '1px solid rgba(255,255,255,0.08)', borderRadius: '8px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -2943,7 +2954,7 @@ function App() {
                             {user.name} <span style={{ color: 'rgba(255,255,255,0.4)', fontWeight: 'normal', fontSize: '10px' }}>({user.username})</span>
                           </div>
                           <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)' }}>
-                            Rol: <span style={{ color: 'var(--accent-cyan)' }}>{user.role}</span> // Clave: <span style={{ color: '#00ff88' }}>{user.password}</span>
+                            Rol: <span style={{ color: 'var(--accent-cyan)' }}>{user.role}</span> // Clave: <span style={{ color: '#00ff88' }}>{user.password || '••••••••'}</span>
                           </div>
                         </div>
                       </div>
@@ -2957,7 +2968,7 @@ function App() {
                             onClick={() => {
                               setEditingUserId(user.id);
                               setFormUser(user.username);
-                              setFormPass(user.password);
+                              setFormPass(user.password || '');
                               setFormName(user.name);
                               setFormRole(user.role);
                               setFormCredits(String(user.credits));
@@ -2969,10 +2980,15 @@ function App() {
                           <button 
                             type="button" 
                             disabled={isAdmin}
-                            onClick={() => {
+                            onClick={async () => {
                               if (confirm(`¿Está seguro de eliminar de forma permanente el acceso para ${user.name}?`)) {
-                                const filtered = usersList.filter(u => u.id !== user.id);
-                                handleUpdateUsers(filtered);
+                                try {
+                                  await authService.deleteUser(user.id);
+                                  alert('Usuario eliminado con éxito de la base de datos centralizada.');
+                                  await fetchUsers();
+                                } catch (error) {
+                                  alert(`Error al eliminar: ${error.message}`);
+                                }
                               }
                             }}
                             style={{ 

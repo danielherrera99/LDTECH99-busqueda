@@ -982,7 +982,7 @@ export const denplaService = {
 export const sunatService_legacy = sunatService;
 export const reniecService_legacy = reniecService;
 
-// ─── Auth Service con base de datos simulada en localStorage ──────────────────
+// ─── Auth Service con base de datos real (con fallback local resiliente en localStorage) ────────
 const defaultUsers = [
   { id: 'usr_ldtech', username: 'ldtech', password: '19992015', name: 'ldtech99', email: 'contacto@ldtech99.com', role: 'Administrador / Principal SysAdmin', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80', credits: '∞' },
   { id: 'usr_cliente', username: 'cliente', password: 'cliente2026', name: 'Cliente Premium', email: 'cliente@ldtech99.com', role: 'Consultor Premium / Cliente', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&h=150&q=80', credits: 150 },
@@ -995,37 +995,51 @@ if (!localStorage.getItem('ldtech_users')) {
 
 export const authService = {
   login: async (username, password) => {
-    await sleep(1500);
-    const usersStr = localStorage.getItem('ldtech_users');
-    let users = [];
     try {
-      users = usersStr ? JSON.parse(usersStr) : defaultUsers;
-    } catch(e) {
-      users = defaultUsers;
+      const res = await fetch(`${BACKEND_URL}/auth/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ username, password })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Credenciales incorrectas. Verifique e intente de nuevo.');
+      }
+      localStorage.setItem('ldtech_token', data.user.token);
+      localStorage.setItem('ldtech_user', JSON.stringify(data.user));
+      return data;
+    } catch (err) {
+      // Fallback si el backend está inactivo o no configurado
+      if (err.message && err.message.includes('Credenciales incorrectas')) {
+        throw err;
+      }
+      console.warn('[AUTH LOGIN FALLBACK]', err.message);
+      await sleep(1000);
+      const usersStr = localStorage.getItem('ldtech_users');
+      let users = usersStr ? JSON.parse(usersStr) : defaultUsers;
+      const found = users.find(u => u.username.trim().toLowerCase() === username.trim().toLowerCase() && u.password === password);
+      if (found) {
+        const mockUser = { 
+          id: found.id, 
+          username: found.name || found.username, 
+          email: found.email, 
+          role: found.role, 
+          avatar: found.avatar, 
+          credits: found.credits,
+          token: `ey.${found.username}.jwt.token.simulation` 
+        };
+        localStorage.setItem('ldtech_token', mockUser.token);
+        localStorage.setItem('ldtech_user', JSON.stringify(mockUser));
+        return { success: true, user: mockUser, source: 'LOCAL_FALLBACK' };
+      }
+      throw new Error('Credenciales incorrectas. Verifique e intente de nuevo.');
     }
-
-    const found = users.find(u => u.username.trim().toLowerCase() === username.trim().toLowerCase() && u.password === password);
-    if (found) {
-      const mockUser = { 
-        id: found.id, 
-        username: found.name || found.username, 
-        email: found.email, 
-        role: found.role, 
-        avatar: found.avatar, 
-        credits: found.credits,
-        token: `ey.${found.username}.jwt.token.simulation` 
-      };
-      localStorage.setItem('ldtech_token', mockUser.token);
-      localStorage.setItem('ldtech_user', JSON.stringify(mockUser));
-      return { success: true, user: mockUser };
-    }
-    throw new Error('Credenciales incorrectas. Verifique e intente de nuevo.');
   },
   getCurrentUser: async () => {
     const token = localStorage.getItem('ldtech_token');
     const userStr = localStorage.getItem('ldtech_user');
     if (!token || !userStr) return null;
-    await sleep(400);
+    await sleep(200);
     return JSON.parse(userStr);
   },
   logout: () => {
@@ -1033,4 +1047,119 @@ export const authService = {
     localStorage.removeItem('ldtech_user');
     return true;
   },
+  getUsers: async () => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/auth/users`, {
+        headers: { 'Accept': 'application/json' }
+      });
+      if (!res.ok) throw new Error('Error al obtener la lista de usuarios.');
+      const data = await res.json();
+      return data.users;
+    } catch (err) {
+      console.warn('[AUTH GET_USERS FALLBACK]', err.message);
+      const usersStr = localStorage.getItem('ldtech_users');
+      return usersStr ? JSON.parse(usersStr) : defaultUsers;
+    }
+  },
+  createUser: async (userData) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/auth/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(userData)
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Error al crear el usuario.');
+      return data.user;
+    } catch (err) {
+      if (err.message && (err.message.includes('ya existe') || err.message.includes('El nombre de usuario') || err.message.includes('email'))) {
+        throw err;
+      }
+      console.warn('[AUTH CREATE_USER FALLBACK]', err.message);
+      const usersStr = localStorage.getItem('ldtech_users');
+      let users = usersStr ? JSON.parse(usersStr) : defaultUsers;
+      const newUser = {
+        id: userData.id || 'usr_' + Math.random().toString(36).substr(2, 9),
+        username: userData.username.trim().toLowerCase(),
+        password: userData.password,
+        name: userData.name,
+        email: userData.email || `${userData.username.trim().toLowerCase()}@ldtech99.com`,
+        role: userData.role,
+        avatar: userData.avatar || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80',
+        credits: userData.credits
+      };
+      if (users.some(u => u.username.toLowerCase() === newUser.username)) {
+        throw new Error('El nombre de usuario ya existe en local.');
+      }
+      users.push(newUser);
+      localStorage.setItem('ldtech_users', JSON.stringify(users));
+      return newUser;
+    }
+  },
+  updateUser: async (id, userData) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/auth/users/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify(userData)
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Error al actualizar el usuario.');
+      return data.user;
+    } catch (err) {
+      if (err.message && (err.message.includes('ya existe') || err.message.includes('El nombre de usuario') || err.message.includes('email'))) {
+        throw err;
+      }
+      console.warn('[AUTH UPDATE_USER FALLBACK]', err.message);
+      const usersStr = localStorage.getItem('ldtech_users');
+      let users = usersStr ? JSON.parse(usersStr) : defaultUsers;
+      users = users.map(u => {
+        if (u.id === id || String(u.id) === String(id)) {
+          return {
+            ...u,
+            username: userData.username.trim().toLowerCase(),
+            password: userData.password || u.password,
+            name: userData.name,
+            role: userData.role,
+            credits: userData.credits
+          };
+        }
+        return u;
+      });
+      localStorage.setItem('ldtech_users', JSON.stringify(users));
+      return {
+        id,
+        username: userData.username.trim().toLowerCase(),
+        name: userData.name,
+        email: userData.email,
+        role: userData.role,
+        credits: userData.credits
+      };
+    }
+  },
+  deleteUser: async (id) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/auth/users/${id}`, {
+        method: 'DELETE',
+        headers: { 'Accept': 'application/json' }
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.message || 'Error al eliminar el usuario.');
+      return data;
+    } catch (err) {
+      if (err.message && (err.message.includes('No está permitido') || err.message.includes('Administrador Principal'))) {
+        throw err;
+      }
+      console.warn('[AUTH DELETE_USER FALLBACK]', err.message);
+      const usersStr = localStorage.getItem('ldtech_users');
+      let users = usersStr ? JSON.parse(usersStr) : defaultUsers;
+      const found = users.find(u => u.id === id || String(u.id) === String(id));
+      if (found && found.username === 'ldtech') {
+        throw new Error('No está permitido eliminar la cuenta del Administrador Principal.');
+      }
+      users = users.filter(u => u.id !== id && String(u.id) !== String(id));
+      localStorage.setItem('ldtech_users', JSON.stringify(users));
+      return { success: true, message: 'Usuario eliminado con éxito de local.' };
+    }
+  }
 };
