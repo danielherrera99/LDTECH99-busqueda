@@ -9,7 +9,7 @@
  * Cada servicio incluye un fallback de alta fidelidad para desarrollo offline.
  */
 
-const BACKEND_URL   = 'http://localhost:8000';
+const BACKEND_URL   = 'https://ldtech99-backend.onrender.com';
 const CODART_DIRECT = 'https://api-codart.cgrt.org/api/v1/consultas';
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
