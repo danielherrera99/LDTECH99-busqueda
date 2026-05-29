@@ -1181,5 +1181,74 @@ export const authService = {
       localStorage.setItem('ldtech_users', JSON.stringify(users));
       return { success: true, message: 'Usuario eliminado con éxito de local.' };
     }
+  },
+  getHistory: async (username) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/auth/history?username=${encodeURIComponent(username)}`, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' }
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Error al obtener historial.');
+      }
+      return data.history;
+    } catch (err) {
+      console.warn('[HISTORY FETCH FALLBACK]', err.message);
+      const saved = localStorage.getItem('osint_query_history');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) return parsed;
+        } catch (e) {}
+      }
+      return [{ query: '20538856674', module: 'ruc' }, { query: '00000000', module: 'dni_basic' }];
+    }
+  },
+  addHistory: async (username, query, module) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/auth/history`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+        body: JSON.stringify({ username, query, module })
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Error al guardar historial.');
+      }
+      localStorage.setItem('osint_query_history', JSON.stringify(data.history));
+      return data.history;
+    } catch (err) {
+      console.warn('[HISTORY ADD FALLBACK]', err.message);
+      const saved = localStorage.getItem('osint_query_history');
+      let history = [];
+      if (saved) {
+        try { history = JSON.parse(saved); } catch (e) {}
+      }
+      if (!Array.isArray(history)) history = [];
+      const newEntry = { query, module };
+      const filtered = history.filter(h => !(h.query === query && h.module === module));
+      const nextHistory = [newEntry, ...filtered.slice(0, 9)];
+      localStorage.setItem('osint_query_history', JSON.stringify(nextHistory));
+      return nextHistory;
+    }
+  },
+  clearHistory: async (username) => {
+    try {
+      const res = await fetch(`${BACKEND_URL}/auth/history?username=${encodeURIComponent(username)}`, {
+        method: 'DELETE',
+        headers: { 'Accept': 'application/json' }
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || 'Error al vaciar historial.');
+      }
+      localStorage.setItem('osint_query_history', JSON.stringify([]));
+      return true;
+    } catch (err) {
+      console.warn('[HISTORY CLEAR FALLBACK]', err.message);
+      localStorage.setItem('osint_query_history', JSON.stringify([]));
+      return true;
+    }
   }
 };

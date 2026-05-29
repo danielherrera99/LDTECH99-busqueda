@@ -320,10 +320,24 @@ function App() {
           setResultsCache(updatedCache);
           localStorage.setItem('osint_results_cache', JSON.stringify(updatedCache));
 
-          // Actualizamos el historial unificado (objeto query + modulo)
-          const newEntry = { query: cleanTarget, module: activeModule };
-          const filtered = queryHistory.filter(h => !(h.query === cleanTarget && h.module === activeModule));
-          setQueryHistory([newEntry, ...filtered.slice(0, 9)]);
+          // Guardamos en la base de datos persistente (Supabase) a través del API
+          if (currentUser && currentUser.username) {
+            try {
+              const updatedHistory = await authService.addHistory(currentUser.username, cleanTarget, activeModule);
+              if (updatedHistory) {
+                setQueryHistory(updatedHistory);
+              }
+            } catch (e) {
+              console.warn('Error al guardar historial en base de datos:', e);
+              const newEntry = { query: cleanTarget, module: activeModule };
+              const filtered = queryHistory.filter(h => !(h.query === cleanTarget && h.module === activeModule));
+              setQueryHistory([newEntry, ...filtered.slice(0, 9)]);
+            }
+          } else {
+            const newEntry = { query: cleanTarget, module: activeModule };
+            const filtered = queryHistory.filter(h => !(h.query === cleanTarget && h.module === activeModule));
+            setQueryHistory([newEntry, ...filtered.slice(0, 9)]);
+          }
         }
       } else {
         setOsintError(response.message || 'La consulta no retornó resultados.');
@@ -1055,13 +1069,20 @@ function App() {
   const [selectedService, setSelectedService] = useState('webapp');
   const [addons, setAddons] = useState(['database', 'admin']);
 
-  // --- Efecto inicial para recuperar la sesión ---
   useEffect(() => {
     const checkSession = async () => {
       const user = await authService.getCurrentUser();
       if (user) {
         setIsAuthenticated(true);
         setCurrentUser(user);
+        
+        // Cargar historial de búsquedas persistente desde la base de datos
+        try {
+          const history = await authService.getHistory(user.username);
+          if (history) setQueryHistory(history);
+        } catch (e) {
+          console.warn('Error al cargar historial desde base de datos:', e);
+        }
       }
       // Cargar lista de usuarios desde la base de datos relacional
       await fetchUsers();
@@ -1095,6 +1116,14 @@ function App() {
       if (response.success) {
         setSuccess('¡Acceso concedido! Descifrando portal...');
         setCurrentUser(response.user);
+        
+        // Cargar historial de búsquedas persistente tras inicio de sesión exitoso
+        try {
+          const history = await authService.getHistory(response.user.username);
+          if (history) setQueryHistory(history);
+        } catch (e) {
+          console.warn('Error al cargar historial tras login:', e);
+        }
         
         // Recargar los usuarios para que el panel administrativo tenga la última información
         await fetchUsers();
@@ -1592,9 +1621,14 @@ function App() {
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                 <h4 style={{ fontSize: '0.78rem', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '1px', margin: 0, fontFamily: 'var(--font-mono)' }}>Búsquedas Recientes</h4>
                 {queryHistory.length > 0 && (
-                  <button type="button" onClick={() => setQueryHistory([])}
+                  <button type="button" onClick={async () => {
+                    setQueryHistory([]);
+                    if (currentUser && currentUser.username) {
+                      try { await authService.clearHistory(currentUser.username); } catch (e) { console.warn(e); }
+                    }
+                  }}
                     style={{ background: 'none', border: 'none', color: 'rgba(255,0,0,0.5)', cursor: 'pointer', fontFamily: 'var(--font-mono)', fontSize: '9px', textTransform: 'uppercase', letterSpacing: '1px', padding: 0 }}
-                    title="Limpiar historial de consultas">
+                    title="Limpiar historial de consultas de la base de datos">
                     [ Limpiar ]
                   </button>
                 )}
