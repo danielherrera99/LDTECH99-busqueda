@@ -91,15 +91,34 @@ function App() {
   const [currentUser, setCurrentUser] = useState(null);
   const [showUserPanel, setShowUserPanel] = useState(false); // Modal de administración de usuarios
   const [usersList, setUsersList] = useState(() => {
-    const saved = localStorage.getItem('ldtech_users');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) { console.warn(e); }
-    }
-    return [
+    const defaultUsers = [
       { id: 'usr_ldtech', username: 'ldtech', password: 'tramun15', name: 'ldtech99', email: 'contacto@ldtech99.com', role: 'Administrador / Principal SysAdmin', avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=150&h=150&q=80', credits: '∞' },
       { id: 'usr_cliente', username: 'cliente', password: 'cliente2026', name: 'Cliente Premium', email: 'cliente@ldtech99.com', role: 'Consultor Premium / Cliente', avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=150&h=150&q=80', credits: 150 },
       { id: 'usr_demo', username: 'demo', password: 'demo123', name: 'Usuario Demo', email: 'demo@ldtech99.com', role: 'Usuario de Pruebas / Demo', avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=150&h=150&q=80', credits: 20 }
     ];
+    const saved = localStorage.getItem('ldtech_users');
+    if (saved) {
+      try { 
+        const parsed = JSON.parse(saved);
+        let updated = false;
+        const nextUsers = parsed.map(u => {
+          const matchingDefault = defaultUsers.find(d => d.username === u.username);
+          if (matchingDefault && u.password !== matchingDefault.password) {
+            u.password = matchingDefault.password;
+            updated = true;
+          }
+          return u;
+        });
+        if (updated) {
+          localStorage.setItem('ldtech_users', JSON.stringify(nextUsers));
+          return nextUsers;
+        }
+        return parsed;
+      } catch (e) { 
+        console.warn(e); 
+      }
+    }
+    return defaultUsers;
   });
 
   const fetchUsers = async () => {

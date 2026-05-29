@@ -989,7 +989,27 @@ const defaultUsers = [
   { id: 'usr_demo', username: 'demo', password: 'demo123', name: 'Usuario Demo', email: 'demo@ldtech99.com', role: 'Usuario de Pruebas / Demo', avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?auto=format&fit=crop&w=150&h=150&q=80', credits: 20 }
 ];
 
-if (!localStorage.getItem('ldtech_users')) {
+// Asegurar que las credenciales locales de los usuarios por defecto estén sincronizadas con la última versión de seguridad
+const savedUsersStr = localStorage.getItem('ldtech_users');
+if (savedUsersStr) {
+  try {
+    const savedUsers = JSON.parse(savedUsersStr);
+    let wasUpdated = false;
+    const nextUsers = savedUsers.map(u => {
+      const matchingDefault = defaultUsers.find(d => d.username === u.username);
+      if (matchingDefault && u.password !== matchingDefault.password) {
+        u.password = matchingDefault.password;
+        wasUpdated = true;
+      }
+      return u;
+    });
+    if (wasUpdated) {
+      localStorage.setItem('ldtech_users', JSON.stringify(nextUsers));
+    }
+  } catch (e) {
+    localStorage.setItem('ldtech_users', JSON.stringify(defaultUsers));
+  }
+} else {
   localStorage.setItem('ldtech_users', JSON.stringify(defaultUsers));
 }
 
